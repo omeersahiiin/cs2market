@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  username  String     @unique
+  password  String
+  balance   Float      @default(10000)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  orders    Order[]
+  positions Position[]
+  conditionalOrders ConditionalOrder[]
+}
+
+model Skin {
+  id            String    @id @default(cuid())
+  name          String
+  type          String
+  rarity        String
+  price         Float
+  iconPath      String
+  wear          String    @default("Factory New")
+  // Float value analysis fields
+  defIndex      Int?      // CS2 definition index (for API calls)
+  paintIndex    Int?      // Paint kit index (for API calls)
+  minFloat      Float?    // Minimum possible float for this skin
+  maxFloat      Float?    // Maximum possible float for this skin
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  positions     Position[]
+  orders        Order[]
+  floatData     FloatData[]
+  conditionalOrders ConditionalOrder[]
+}
+
+model Position {
+  id         String   @id @default(cuid())
+  userId     String
+  skinId     String
+  type       String   // "LONG" or "SHORT"
+  entryPrice Float
+  exitPrice  Float?   // Price when position was closed
+  size       Float
+  margin     Float
+  closedAt   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
+  skin       Skin     @relation(fields: [skinId], references: [id])
+  conditionalOrders ConditionalOrder[]
+
+  @@index([userId])
+  @@index([skinId])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  userId        String
+  skinId        String
+  side          String   // "BUY" or "SELL"
+  orderType     String   // "MARKET" or "LIMIT"
+  positionType  String   // "LONG" or "SHORT"
+  price         Float    // Limit price (null for market orders)
+  quantity      Float    // Number of contracts/units
+  filledQty     Float    @default(0) // Quantity filled so far
+  remainingQty  Float    // Quantity remaining to be filled
+  status        String   // "PENDING", "PARTIAL", "FILLED", "CANCELLED", "REJECTED"
+  timeInForce   String   @default("GTC") // "GTC" (Good Till Cancelled), "IOC" (Immediate or Cancel), "FOK" (Fill or Kill)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  filledAt      DateTime? // When order was completely filled
+  cancelledAt   DateTime? // When order was cancelled
+  
+  // Relations
+  skin          Skin     @relation(fields: [skinId], references: [id])
+  user          User     @relation(fields: [userId], references: [id])
+  fills         OrderFill[]
+
+  // Indexes for order book queries
+  @@index([skinId, side, status])
+  @@index([skinId, price, createdAt])
+  @@index([userId, status])
+}
+
+// New model to track individual fills/executions
+model OrderFill {
+  id        String   @id @default(cuid())
+  orderId   String
+  price     Float    // Execution price
+  quantity  Float    // Quantity filled in this execution
+  createdAt DateTime @default(now())
+  
+  // Relations
+  order     Order    @relation(fields: [orderId], references: [id])
+  
+  @@index([orderId])
+}
+
+// Model for conditional orders (stop-loss, take-profit, stop-limit)
+model ConditionalOrder {
+  id                String    @id @default(cuid())
+  userId            String
+  skinId            String
+  orderType         String    // "STOP_LOSS", "TAKE_PROFIT", "STOP_LIMIT"
+  triggerPrice      Float     // Price that triggers the order
+  limitPrice        Float?    // Limit price for stop-limit orders
+  side              String    // "BUY" or "SELL"
+  positionType      String    // "LONG" or "SHORT"
+  quantity          Float     // Quantity to trade when triggered
+  status            String    // "PENDING", "TRIGGERED", "FILLED", "CANCELLED"
+  linkedPositionId  String?   // Optional link to a specific position
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  triggeredAt       DateTime? // When the order was triggered
+  filledAt          DateTime? // When the order was filled
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  skin              Skin      @relation(fields: [skinId], references: [id])
+  linkedPosition    Position? @relation(fields: [linkedPositionId], references: [id])
+  
+  // Indexes for efficient monitoring
+  @@index([skinId, status])
+  @@index([userId, status])
+  @@index([triggerPrice, status])
+}
+
+// New model to track float value data and pricing
+model FloatData {
+  id            String   @id @default(cuid())
+  skinId        String
+  wear          String   // "Factory New", "Minimal Wear", etc.
+  floatMin      Float    // Minimum float for this wear range
+  floatMax      Float    // Maximum float for this wear range
+  avgFloat      Float    // Average float value for this wear
+  avgPrice      Float    // Average price for this float range
+  sampleSize    Int      // Number of samples this data is based on
+  lastUpdated   DateTime @default(now())
+  
+  // Detailed float ranges with pricing
+  priceRanges   FloatPriceRange[]
+  
+  // Relations
+  skin          Skin     @relation(fields: [skinId], references: [id])
+  
+  @@unique([skinId, wear])
+  @@index([skinId])
+}
+
+// Model to track specific float ranges and their market prices
+model FloatPriceRange {
+  id            String    @id @default(cuid())
+  floatDataId   String
+  floatMin      Float     // e.g., 0.15
+  floatMax      Float     // e.g., 0.20
+  avgPrice      Float     // Average price for this specific float range
+  sampleSize    Int       // Number of items in this range
+  lastUpdated   DateTime  @default(now())
+  
+  // Relations
+  floatData     FloatData @relation(fields: [floatDataId], references: [id])
+  
+  @@index([floatDataId])
+  @@index([floatMin, floatMax])
+}
