@@ -15,20 +15,36 @@ export async function GET(request: Request) {
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const order = searchParams.get('order') || 'desc';
     
-    // Use the robust database connection with retry logic
-    const skins = await PrismaClientSingleton.executeWithRetry(
-      async (prisma) => {
-        return await prisma.skin.findMany({
-          orderBy: {
-            [sortBy === 'volume24h' ? 'createdAt' : sortBy]: order as 'asc' | 'desc',
-          },
-          take: limit,
-        });
-      },
-      'fetch skins'
-    );
+    let skins = [];
+    let isUsingMockData = false;
     
-    console.log(`✅ Successfully fetched ${skins.length} skins from database`);
+    try {
+      // Use the robust database connection with retry logic
+      skins = await PrismaClientSingleton.executeWithRetry(
+        async (prisma) => {
+          return await prisma.skin.findMany({
+            orderBy: {
+              [sortBy === 'volume24h' ? 'createdAt' : sortBy]: order as 'asc' | 'desc',
+            },
+            take: limit,
+          });
+        },
+        'fetch skins'
+      );
+      
+      console.log(`✅ Successfully fetched ${skins.length} skins from database`);
+    } catch (dbError) {
+      console.log('⚠️ Database unavailable, using mock data...', dbError instanceof Error ? dbError.message : 'Unknown error');
+      skins = generateMockSkins(limit);
+      isUsingMockData = true;
+    }
+    
+    // If we got no skins from database, use mock data as fallback
+    if (!skins || skins.length === 0) {
+      console.log('📦 No skins found in database, using mock data...');
+      skins = generateMockSkins(limit);
+      isUsingMockData = true;
+    }
     
     // Enhance skins with market data for analysis
     const enhancedSkins = skins.map((skin: any) => {
@@ -58,44 +74,31 @@ export async function GET(request: Request) {
       total: enhancedSkins.length,
       page: 1,
       limit: limit,
-      success: true
+      success: true,
+      mock: isUsingMockData,
+      message: isUsingMockData ? 'Using mock data - database temporarily unavailable' : 'Data loaded from database'
     });
   } catch (error) {
-    console.error('❌ Detailed error fetching skins:', {
+    console.error('❌ Critical error in skins API:', {
       error,
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    // If database is completely unavailable, return mock data
-    if (error instanceof Error && (
-      error.message.includes('prepared statement') || 
-      error.message.includes('connection') ||
-      error.message.includes('timeout')
-    )) {
-      console.log('🔄 Database unavailable, returning mock data...');
-      
-      const mockSkins = generateMockSkins(parseInt(new URL(request.url).searchParams.get('limit') || '50'));
-      
-      return NextResponse.json({
-        skins: mockSkins,
-        total: mockSkins.length,
-        page: 1,
-        limit: mockSkins.length,
-        success: true,
-        mock: true,
-        message: 'Using mock data due to database connectivity issues'
-      });
-    }
+    // Final fallback - always return mock data if everything fails
+    console.log('🆘 Critical error, returning emergency mock data...');
+    const emergencyMockSkins = generateMockSkins(parseInt(new URL(request.url).searchParams.get('limit') || '50'));
     
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch skins',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        success: false
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      skins: emergencyMockSkins,
+      total: emergencyMockSkins.length,
+      page: 1,
+      limit: emergencyMockSkins.length,
+      success: true,
+      mock: true,
+      emergency: true,
+      message: 'Emergency mock data - please check system status'
+    });
   }
 }
 
