@@ -9,18 +9,23 @@ interface PriceEmpireConfig {
   timeout: number;
 }
 
+interface PriceEmpireItem {
+  market_hash_name: string;
+  currency: string;
+  suggested_price: number;
+  item_page: string;
+  market_page: string;
+  min_price: number;
+  max_price: number;
+  mean_price: number;
+  quantity: number;
+  created_at: number;
+  updated_at: number;
+}
+
 interface PriceEmpireResponse {
   success: boolean;
-  data: {
-    name: string;
-    price: number;
-    currency: string;
-    timestamp: string;
-    sources: string[];
-    volume?: number;
-    change24h?: number;
-    history?: Array<{date: string, price: number}>;
-  };
+  data?: PriceEmpireItem[];
   error?: string;
 }
 
@@ -31,10 +36,10 @@ export class PriceEmpireService {
 
   constructor() {
     this.config = {
-      apiKey: process.env.PRICEMPIRE_API_KEY || '',
-      baseUrl: process.env.PRICEMPIRE_API_URL || 'https://api.pricempire.com/v1',
+      apiKey: process.env.PRICEMPIRE_API_KEY || '3d5a32f3-2a0c-414e-b98e-17160197f254',
+      baseUrl: 'https://api.pricempire.com/v1',
       rateLimit: parseInt(process.env.PRICEMPIRE_RATE_LIMIT || '100'),
-      timeout: parseInt(process.env.PRICEMPIRE_TIMEOUT || '5000')
+      timeout: parseInt(process.env.PRICEMPIRE_TIMEOUT || '10000')
     };
   }
 
@@ -57,7 +62,7 @@ export class PriceEmpireService {
   }
 
   /**
-   * Get current price for a specific skin
+   * Get current price for a specific skin using PriceEmpire API
    */
   public async getSkinPrice(skinName: string, wear: string = 'Field-Tested'): Promise<number | null> {
     if (!this.isConfigured()) {
@@ -71,17 +76,26 @@ export class PriceEmpireService {
     }
 
     try {
-      const response = await this.makeRequest(`/skins/price`, {
-        name: skinName,
-        wear: wear,
-        format: 'json'
+      // Format the market hash name as expected by Steam/PriceEmpire
+      const marketHashName = `${skinName} (${wear})`;
+      
+      const response = await this.makeRequest('/getAllItems', {
+        search: marketHashName,
+        currency: 'USD'
       });
 
-      if (response.success && response.data) {
+      if (response.success && response.data && response.data.length > 0) {
+        const item = response.data[0];
         this.updateRateLimit();
-        return response.data.price;
+        
+        // Use suggested_price as the primary price, fallback to mean_price
+        const price = item.suggested_price || item.mean_price || item.min_price;
+        
+        console.log(`✅ PriceEmpire: ${marketHashName} = $${price.toFixed(2)}`);
+        return price;
       }
 
+      console.warn(`⚠️ PriceEmpire: No data found for ${marketHashName}`);
       return null;
     } catch (error) {
       console.error('PriceEmpire API error:', error);
@@ -100,101 +114,81 @@ export class PriceEmpireService {
       return prices;
     }
 
-    try {
-      // Check if they support batch requests
-      const response = await this.makeRequest(`/skins/batch-price`, {
-        skins: skins,
-        format: 'json'
-      });
+    console.log(`🔄 PriceEmpire: Fetching batch prices for ${skins.length} skins...`);
 
-      if (response.success && Array.isArray(response.data)) {
-        for (const item of response.data) {
-          const key = `${item.name}_${item.wear}`;
-          prices.set(key, item.price);
-        }
-      }
-
-      this.updateRateLimit();
-    } catch (error) {
-      console.error('PriceEmpire batch API error:', error);
-      
-      // Fallback to individual requests if batch fails
-      for (const skin of skins) {
+    // PriceEmpire doesn't have a true batch endpoint, so we'll make individual requests
+    // with proper rate limiting
+    for (const skin of skins) {
+      try {
         const price = await this.getSkinPrice(skin.name, skin.wear);
-        if (price) {
+        if (price && price > 0) {
           const key = `${skin.name}_${skin.wear}`;
           prices.set(key, price);
         }
-        // Small delay between requests
-        await this.delay(100);
+        
+        // Rate limiting: wait between requests
+        await this.delay(1000 / (this.config.rateLimit / 60)); // Respect rate limit
+      } catch (error) {
+        console.error(`Error fetching price for ${skin.name}:`, error);
       }
     }
 
+    console.log(`✅ PriceEmpire: Successfully fetched ${prices.size}/${skins.length} prices`);
     return prices;
   }
 
   /**
-   * Get historical price data for a skin
+   * Search for items by name
    */
-  public async getHistoricalPrices(
-    skinName: string, 
-    wear: string, 
-    days: number = 30
-  ): Promise<Array<{date: string, price: number}> | null> {
+  public async searchItems(query: string, limit: number = 10): Promise<PriceEmpireItem[]> {
     if (!this.isConfigured()) {
-      return null;
+      return [];
     }
 
     try {
-      const response = await this.makeRequest(`/skins/history`, {
-        name: skinName,
-        wear: wear,
-        days: days,
-        format: 'json'
+      const response = await this.makeRequest('/getAllItems', {
+        search: query,
+        currency: 'USD',
+        limit: limit
       });
 
       if (response.success && response.data) {
         this.updateRateLimit();
-        return response.data.history || [];
+        return response.data;
       }
 
-      return null;
+      return [];
     } catch (error) {
-      console.error('PriceEmpire history API error:', error);
-      return null;
+      console.error('PriceEmpire search error:', error);
+      return [];
     }
   }
 
   /**
-   * Get market statistics for a skin
+   * Get all CS2 items (for initial database population)
    */
-  public async getMarketStats(skinName: string, wear: string): Promise<any | null> {
+  public async getAllCS2Items(limit: number = 1000): Promise<PriceEmpireItem[]> {
     if (!this.isConfigured()) {
-      return null;
+      return [];
     }
 
     try {
-      const response = await this.makeRequest(`/skins/stats`, {
-        name: skinName,
-        wear: wear,
-        format: 'json'
+      const response = await this.makeRequest('/getAllItems', {
+        currency: 'USD',
+        limit: limit,
+        game: 'csgo' // CS2 items are still under 'csgo' in most APIs
       });
 
       if (response.success && response.data) {
         this.updateRateLimit();
-        return {
-          price: response.data.price,
-          volume24h: response.data.volume,
-          change24h: response.data.change24h,
-          sources: response.data.sources,
-          lastUpdated: response.data.timestamp
-        };
+        console.log(`✅ PriceEmpire: Retrieved ${response.data.length} CS2 items`);
+        return response.data;
       }
 
-      return null;
+      return [];
     } catch (error) {
-      console.error('PriceEmpire stats API error:', error);
-      return null;
+      console.error('PriceEmpire getAllItems error:', error);
+      return [];
     }
   }
 
@@ -217,13 +211,12 @@ export class PriceEmpireService {
 
       console.log(`📊 Updating ${skins.length} skins via PriceEmpire`);
 
-      // Prepare batch request
+      // Get prices using batch method (with rate limiting)
       const skinRequests = skins.map((skin: any) => ({
         name: skin.name,
         wear: skin.wear
       }));
 
-      // Try batch request first
       const batchPrices = await this.getBatchPrices(skinRequests);
 
       // Update database with new prices
@@ -262,8 +255,12 @@ export class PriceEmpireService {
     
     // Add query parameters
     Object.keys(params).forEach(key => {
-      url.searchParams.append(key, params[key]);
+      if (params[key] !== undefined && params[key] !== null) {
+        url.searchParams.append(key, params[key].toString());
+      }
     });
+
+    console.log(`🌐 PriceEmpire API Request: ${url.toString()}`);
 
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -280,7 +277,13 @@ export class PriceEmpireService {
       throw new Error(`PriceEmpire API error: ${response.status} ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    
+    // PriceEmpire returns data directly, not wrapped in success/data structure
+    return {
+      success: true,
+      data: Array.isArray(data) ? data : [data]
+    };
   }
 
   /**
@@ -314,7 +317,7 @@ export class PriceEmpireService {
   public getStatus(): any {
     return {
       configured: this.isConfigured(),
-      apiKey: this.config.apiKey ? 'SET' : 'NOT SET',
+      apiKey: this.config.apiKey ? `${this.config.apiKey.slice(0, 8)}...` : 'NOT SET',
       baseUrl: this.config.baseUrl,
       rateLimit: this.config.rateLimit,
       lastRequest: new Date(this.lastRequest),
@@ -331,11 +334,20 @@ export class PriceEmpireService {
     }
 
     try {
+      console.log('🧪 Testing PriceEmpire API connection...');
+      
       // Test with a popular skin
       const price = await this.getSkinPrice('AK-47 | Redline', 'Field-Tested');
-      return price !== null && price > 0;
+      const isWorking = price !== null && price > 0;
+      
+      console.log(isWorking ? 
+        `✅ PriceEmpire API connection successful! Test price: $${price?.toFixed(2)}` : 
+        '❌ PriceEmpire API connection failed'
+      );
+      
+      return isWorking;
     } catch (error) {
-      console.error('PriceEmpire connection test failed:', error);
+      console.error('❌ PriceEmpire connection test failed:', error);
       return false;
     }
   }

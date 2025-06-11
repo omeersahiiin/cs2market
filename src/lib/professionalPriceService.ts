@@ -1,7 +1,9 @@
 /**
  * Professional Price Service with Official API Keys
- * Solves rate limiting and provides real-time accurate pricing
+ * Now integrated with PriceEmpire as primary data source
  */
+
+import { PriceEmpireService } from './priceEmpireService';
 
 interface PriceData {
   platform: string;
@@ -23,10 +25,11 @@ interface SkinPriceInfo {
 
 // Rate limiting configuration
 const RATE_LIMITS: Record<string, number> = {
-  csfloat: 2000, // 2 seconds between requests
-  steam: 1000,   // 1 second between requests
-  skinport: 1500, // 1.5 seconds between requests
-  dmarket: 1000   // 1 second between requests
+  pricempire: 1000, // 1 second between requests
+  csfloat: 2000,    // 2 seconds between requests
+  steam: 1000,      // 1 second between requests
+  skinport: 1500,   // 1.5 seconds between requests
+  dmarket: 1000     // 1 second between requests
 };
 
 // Last request timestamps for rate limiting
@@ -38,6 +41,11 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes for professional data
 
 export class ProfessionalPriceService {
   private static instance: ProfessionalPriceService;
+  private priceEmpireService: PriceEmpireService;
+  
+  constructor() {
+    this.priceEmpireService = PriceEmpireService.getInstance();
+  }
   
   static getInstance(): ProfessionalPriceService {
     if (!ProfessionalPriceService.instance) {
@@ -62,6 +70,40 @@ export class ProfessionalPriceService {
     }
 
     lastRequests[platform] = Date.now();
+  }
+
+  /**
+   * Fetch from PriceEmpire API (Primary source)
+   */
+  private async fetchPriceEmpirePrice(skinName: string, wear: string): Promise<PriceData | null> {
+    try {
+      await this.waitForRateLimit('pricempire');
+
+      if (!this.priceEmpireService.isConfigured()) {
+        console.warn('⚠️ PriceEmpire API not configured');
+        return null;
+      }
+
+      const price = await this.priceEmpireService.getSkinPrice(skinName, wear);
+      
+      if (price && price > 0) {
+        console.log(`✅ PriceEmpire: ${skinName} (${wear}) = $${price.toFixed(2)}`);
+        
+        return {
+          platform: 'PriceEmpire',
+          price: Math.round(price * 100) / 100,
+          currency: 'USD',
+          timestamp: new Date(),
+          volume: 100, // PriceEmpire doesn't provide volume, use default
+          wear
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`❌ PriceEmpire error for ${skinName}:`, error);
+      return null;
+    }
   }
 
   /**
@@ -251,7 +293,7 @@ export class ProfessionalPriceService {
   }
 
   /**
-   * Fetch prices from all available APIs with proper rotation
+   * Fetch prices from all available APIs with PriceEmpire as primary source
    */
   async fetchSkinPrice(skinName: string, wear: string = 'Field-Tested'): Promise<SkinPriceInfo> {
     // Check cache first
@@ -263,8 +305,9 @@ export class ProfessionalPriceService {
 
     console.log(`🔄 Fetching professional prices for ${skinName} (${wear})...`);
 
-    // Fetch from all available APIs in parallel with proper rate limiting
+    // Fetch from all available APIs with PriceEmpire as primary source
     const pricePromises = [
+      this.fetchPriceEmpirePrice(skinName, wear), // Primary source
       this.fetchCSFloatPrice(skinName, wear),
       this.fetchSteamMarketPrice(skinName, wear),
       this.fetchSkinPortPrice(skinName, wear)
@@ -286,9 +329,10 @@ export class ProfessionalPriceService {
     if (prices.length > 0) {
       // Weight by platform reliability and volume
       const weights: Record<string, number> = {
-        'CSFloat': 0.4,
-        'Steam Market': 0.4,
-        'SkinPort': 0.2
+        'PriceEmpire': 0.5,  // Highest weight for primary source
+        'CSFloat': 0.3,
+        'Steam Market': 0.15,
+        'SkinPort': 0.05
       };
 
       let totalWeight = 0;
@@ -304,7 +348,7 @@ export class ProfessionalPriceService {
       });
 
       averagePrice = totalWeight > 0 ? weightedSum / totalWeight : 0;
-      confidence = Math.min(prices.length * 33, 100); // 33% per source, max 100%
+      confidence = Math.min(prices.length * 25, 100); // 25% per source, max 100%
       
       console.log(`💰 Professional average: $${averagePrice.toFixed(2)} (${confidence}% confidence)`);
     } else {
@@ -442,6 +486,7 @@ export class ProfessionalPriceService {
     return {
       cacheSize: priceCache.size,
       apiKeys: {
+        pricempire: !!process.env.PRICEMPIRE_API_KEY,
         csfloat: !!process.env.CSFLOAT_API_KEY,
         steam: !!process.env.STEAM_API_KEY,
         skinport: !!process.env.SKINPORT_API_KEY,
