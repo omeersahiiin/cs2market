@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { PrismaClientSingleton } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/prisma';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -27,23 +29,33 @@ export async function POST(request: Request) {
     }
 
     // Check if user already has a position for this skin
-    const existingPosition = await prisma.position.findFirst({
-      where: {
-        skinId,
-        userId: session.user.id,
-        closedAt: null,
+    const existingPosition = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.position.findFirst({
+          where: {
+            skinId,
+            userId: session.user.id,
+            closedAt: null,
+          },
+        });
       },
-    });
+      'fetch existing position'
+    );
 
     if (existingPosition) {
       return new NextResponse('Position already exists for this skin', { status: 400 });
     }
 
     // Get user's current balance
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { balance: true },
-    });
+    const user = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { balance: true },
+        });
+      },
+      'fetch user balance'
+    );
 
     if (!user) {
       return new NextResponse('User not found', { status: 404 });
@@ -58,22 +70,27 @@ export async function POST(request: Request) {
     }
 
     // Create position and update user balance in a transaction
-    const [position] = await prisma.$transaction([
-      prisma.position.create({
-        data: {
-          skinId,
-          userId: session.user.id,
-          type,
-          entryPrice,
-          size,
-          margin: requiredMargin,
-        },
-      }),
-      prisma.user.update({
-        where: { id: session.user.id },
-        data: { balance: { decrement: requiredMargin } },
-      }),
-    ]);
+    const [position] = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.$transaction([
+          prisma.position.create({
+            data: {
+              skinId,
+              userId: session.user.id,
+              type,
+              entryPrice,
+              size,
+              margin: requiredMargin,
+            },
+          }),
+          prisma.user.update({
+            where: { id: session.user.id },
+            data: { balance: { decrement: requiredMargin } },
+          }),
+        ]);
+      },
+      'create position and update balance'
+    );
 
     return NextResponse.json(position);
   } catch (error) {
@@ -82,35 +99,41 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.id) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
+// GET /api/positions - Get all positions for the authenticated user
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const skinId = searchParams.get('skinId');
-    const all = searchParams.get('all');
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
-    const positions = await prisma.position.findMany({
-      where: {
-        userId: session.user.id,
-        ...(skinId ? { skinId } : {}),
-        ...(all ? {} : { closedAt: null }),
+    const positions = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.position.findMany({
+          where: {
+            userId: session.user.id
+          },
+          include: {
+            skin: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
       },
-      include: {
-        skin: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+      'fetch all user positions'
+    );
 
     return NextResponse.json(positions);
   } catch (error) {
     console.error('Error fetching positions:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch positions' },
+      { status: 500 }
+    );
   }
 } 

@@ -1,36 +1,49 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { PrismaClientSingleton } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
+// GET /api/positions/[skinId] - Get positions for a specific skin
 export async function GET(
   request: Request,
   { params }: { params: { skinId: string } }
 ) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.id) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    const positions = await prisma.position.findMany({
-      where: {
-        skinId: params.skinId,
-        userId: session.user.id,
-        closedAt: null,
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const positions = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.position.findMany({
+          where: {
+            skinId: params.skinId,
+            userId: session.user.id
+          },
+          include: {
+            skin: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
       },
-      include: {
-        skin: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+      'fetch user positions for skin'
+    );
 
     return NextResponse.json(positions);
   } catch (error) {
-    console.error('Error fetching position:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Error fetching positions:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch positions' },
+      { status: 500 }
+    );
   }
 } 

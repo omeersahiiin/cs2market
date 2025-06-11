@@ -1,6 +1,6 @@
+import { PrismaClientSingleton } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import RealPriceService from '@/lib/realPriceService';
+import { ProfessionalPriceService } from '@/lib/professionalPriceService';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,74 +10,67 @@ let updateInterval: NodeJS.Timeout | null = null;
 
 export async function POST() {
   try {
-    if (isUpdating) {
-      return NextResponse.json({ 
-        message: 'Price update already in progress',
-        status: 'running'
-      });
-    }
+    console.log('🔄 Starting bulk price update...');
+    
+    const skins = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.skin.findMany();
+      },
+      'fetch all skins for price update'
+    );
 
-    console.log('🚀 Starting background price update service...');
-    isUpdating = true;
-
-    // Get all skins
-    const skins = await prisma.skin.findMany();
-    const updateResults = [];
+    let updatedCount = 0;
+    const errors: string[] = [];
+    const priceService = ProfessionalPriceService.getInstance();
 
     for (const skin of skins) {
       try {
-        console.log(`📊 Updating ${skin.name}...`);
+        const newPrice = await priceService.getAverageMarketPrice(skin.name);
         
-        // Get real market price
-        const realPrice = await RealPriceService.getAverageMarketPrice(skin.name);
-        const currentPrice = parseFloat(skin.price.toString());
-        
-        // Update if price has changed significantly or if it's still around $52 (problematic)
-        const priceChange = Math.abs(realPrice - currentPrice) / currentPrice;
-        const isProblematicPrice = currentPrice >= 50 && currentPrice <= 55;
-        
-        if (priceChange > 0.01 || isProblematicPrice) { // 1% threshold or problematic price
-          await prisma.skin.update({
-            where: { id: skin.id },
-            data: { price: realPrice }
-          });
+        if (newPrice && newPrice !== parseFloat(skin.price.toString())) {
+          await PrismaClientSingleton.executeWithRetry(
+            async (prisma) => {
+              return await prisma.skin.update({
+                where: { id: skin.id },
+                data: { 
+                  price: newPrice,
+                  updatedAt: new Date()
+                }
+              });
+            },
+            `update price for ${skin.name}`
+          );
           
-          console.log(`💰 Updated ${skin.name}: $${currentPrice.toFixed(2)} → $${realPrice.toFixed(2)}`);
-          updateResults.push({
-            skinName: skin.name,
-            oldPrice: currentPrice,
-            newPrice: realPrice,
-            change: priceChange * 100
-          });
-        } else {
-          console.log(`✅ ${skin.name}: Price stable at $${currentPrice.toFixed(2)}`);
+          updatedCount++;
+          console.log(`✅ Updated ${skin.name}: $${skin.price} → $${newPrice}`);
         }
-        
       } catch (error) {
-        console.error(`❌ Error updating ${skin.name}:`, error);
-        updateResults.push({
-          skinName: skin.name,
-          error: error instanceof Error ? error.message : String(error)
-        });
+        const errorMsg = `Failed to update ${skin.name}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        errors.push(errorMsg);
+        console.error('❌', errorMsg);
       }
     }
 
-    isUpdating = false;
-    
+    console.log(`🎉 Price update complete: ${updatedCount}/${skins.length} skins updated`);
+
     return NextResponse.json({
-      message: 'Price update completed',
-      updatedSkins: updateResults.length,
-      results: updateResults,
-      timestamp: new Date().toISOString()
+      success: true,
+      message: `Updated ${updatedCount} out of ${skins.length} skins`,
+      updatedCount,
+      totalSkins: skins.length,
+      errors: errors.length > 0 ? errors : undefined
     });
 
   } catch (error) {
-    isUpdating = false;
-    console.error('❌ Error in price update service:', error);
-    return NextResponse.json({ 
-      error: 'Price update failed',
-      message: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    console.error('❌ Bulk price update failed:', error);
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Failed to update prices',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -89,18 +82,24 @@ export async function GET() {
     }
 
     console.log('🔄 Starting continuous price updates every 10 seconds...');
+    const priceService = ProfessionalPriceService.getInstance();
     
     updateInterval = setInterval(async () => {
       if (!isUpdating) {
         try {
           console.log('⏰ Scheduled price update starting...');
           
-          const skins = await prisma.skin.findMany();
+          const skins = await PrismaClientSingleton.executeWithRetry(
+            async (prisma) => {
+              return await prisma.skin.findMany();
+            },
+            'fetch all skins for price update'
+          );
           let updatedCount = 0;
 
           for (const skin of skins) {
             try {
-              const realPrice = await RealPriceService.getAverageMarketPrice(skin.name);
+              const realPrice = await priceService.getAverageMarketPrice(skin.name);
               const currentPrice = parseFloat(skin.price.toString());
               
               // Update if significant change or problematic price
@@ -108,10 +107,18 @@ export async function GET() {
               const isProblematicPrice = currentPrice >= 50 && currentPrice <= 55;
               
               if (priceChange > 0.01 || isProblematicPrice) {
-                await prisma.skin.update({
-                  where: { id: skin.id },
-                  data: { price: realPrice }
-                });
+                await PrismaClientSingleton.executeWithRetry(
+                  async (prisma) => {
+                    return await prisma.skin.update({
+                      where: { id: skin.id },
+                      data: { 
+                        price: realPrice,
+                        updatedAt: new Date()
+                      }
+                    });
+                  },
+                  `update price for ${skin.name}`
+                );
                 
                 console.log(`💰 Auto-updated ${skin.name}: $${currentPrice.toFixed(2)} → $${realPrice.toFixed(2)}`);
                 updatedCount++;
