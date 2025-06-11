@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
 
 const prisma = new PrismaClient();
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     // If order was filled (fully or partially), create positions and update balance
     if (result.matchResult.fills.length > 0) {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // Calculate total filled quantity and average fill price
         const userFills = result.matchResult.fills.filter(
           fill => fill.buyUserId === user.id || fill.sellUserId === user.id
