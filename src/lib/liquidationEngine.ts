@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { OrderMatchingEngine } from './orderMatchingEngine';
 
 const prisma = new PrismaClient();
@@ -224,7 +224,7 @@ export class LiquidationEngine {
       remainingBalance = Math.max(0, position.margin + pnl);
 
       // Update position and user balance
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // Close the position
         await tx.position.update({
           where: { id: position.id },

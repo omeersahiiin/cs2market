@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { PriceOracle } from './priceOracle';
 
 const prisma = new PrismaClient();
@@ -87,7 +87,7 @@ export class FundingRateManager {
     // Calculate hourly funding rate (divide annual by 8760 hours)
     const hourlyRate = fundingData.rate / 8760 / 100; // Convert to decimal
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       for (const position of positions) {
         const shouldPayFunding = 
           (fundingData.direction === 'LONG_PAYS' && position.type === 'LONG') ||

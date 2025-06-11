@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -311,7 +311,7 @@ export class OrderMatchingEngine {
    * Execute fills and update orders in the database
    */
   private async executeFills(fills: MatchResult['fills'], updatedOrders: MatchResult['updatedOrders']) {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create fill records
       for (const fill of fills) {
         await tx.orderFill.create({
