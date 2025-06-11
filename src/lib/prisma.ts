@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { env } from '@/lib/env';
 
 declare global {
   var prisma: PrismaClient | undefined;
@@ -12,10 +13,10 @@ class PrismaClientSingleton {
   static getInstance(): PrismaClient {
     if (!PrismaClientSingleton.instance) {
       PrismaClientSingleton.instance = new PrismaClient({
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+        log: env.isDevelopment ? ['query', 'error', 'warn'] : ['error'],
         datasources: {
           db: {
-            url: process.env.DATABASE_URL,
+            url: env.DATABASE_URL,
           },
         },
       });
@@ -50,10 +51,10 @@ class PrismaClientSingleton {
             
             // Create new instance
             PrismaClientSingleton.instance = new PrismaClient({
-              log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+              log: env.isDevelopment ? ['query', 'error', 'warn'] : ['error'],
               datasources: {
                 db: {
-                  url: process.env.DATABASE_URL,
+                  url: env.DATABASE_URL,
                 },
               },
             });
@@ -94,7 +95,7 @@ class PrismaClientSingleton {
 // Use global variable in development to prevent multiple instances
 const prisma = globalThis.prisma ?? PrismaClientSingleton.getInstance();
 
-if (process.env.NODE_ENV !== 'production') {
+if (env.isDevelopment) {
   globalThis.prisma = prisma;
 }
 

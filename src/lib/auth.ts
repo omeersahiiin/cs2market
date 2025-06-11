@@ -1,9 +1,8 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
+import { PrismaClientSingleton } from '@/lib/prisma';
+import { env } from '@/lib/env';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,31 +17,41 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid credentials');
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+        try {
+          const user = await PrismaClientSingleton.executeWithRetry(
+            async (prisma) => {
+              return await prisma.user.findUnique({
+                where: {
+                  email: credentials.email
+                }
+              });
+            },
+            'find user for authentication'
+          );
+
+          if (!user || !user.password) {
+            throw new Error('Invalid credentials');
           }
-        });
 
-        if (!user || !user.password) {
-          throw new Error('Invalid credentials');
+          const isCorrectPassword = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!isCorrectPassword) {
+            throw new Error('Invalid credentials');
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            balance: user.balance,
+          };
+        } catch (error) {
+          console.error('Authentication error:', error);
+          throw new Error('Authentication failed - please try again');
         }
-
-        const isCorrectPassword = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!isCorrectPassword) {
-          throw new Error('Invalid credentials');
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          balance: user.balance,
-        };
       }
     })
   ],
@@ -66,8 +75,20 @@ export const authOptions: NextAuthOptions = {
         // Fetch balance from DB if not present
         let balance = user.balance;
         if (typeof balance === 'undefined') {
-          const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-          balance = dbUser?.balance ?? 0;
+          try {
+            const dbUser = await PrismaClientSingleton.executeWithRetry(
+              async (prisma) => {
+                return await prisma.user.findUnique({ 
+                  where: { id: user.id } 
+                });
+              },
+              'fetch user balance'
+            );
+            balance = dbUser?.balance ?? 0;
+          } catch (error) {
+            console.error('Error fetching user balance:', error);
+            balance = 0; // Default fallback
+          }
         }
         token.id = user.id;
         token.username = user.username;
@@ -75,5 +96,7 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     }
-  }
+  },
+  secret: env.NEXTAUTH_SECRET,
+  debug: env.isDevelopment
 }; 
