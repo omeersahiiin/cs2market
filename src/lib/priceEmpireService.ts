@@ -37,7 +37,7 @@ export class PriceEmpireService {
   constructor() {
     this.config = {
       apiKey: process.env.PRICEMPIRE_API_KEY || '3d5a32f3-2a0c-414e-b98e-17160197f254',
-      baseUrl: 'https://api.pricempire.com/v1',
+      baseUrl: 'https://pricempire.com/api/v2',
       rateLimit: parseInt(process.env.PRICEMPIRE_RATE_LIMIT || '100'),
       timeout: parseInt(process.env.PRICEMPIRE_TIMEOUT || '10000')
     };
@@ -79,9 +79,10 @@ export class PriceEmpireService {
       // Format the market hash name as expected by Steam/PriceEmpire
       const marketHashName = `${skinName} (${wear})`;
       
-      const response = await this.makeRequest('/getAllItems', {
+      const response = await this.makeRequest('/items', {
         search: marketHashName,
-        currency: 'USD'
+        currency: 'USD',
+        appid: 730 // CS2/CSGO app ID
       });
 
       if (response.success && response.data && response.data.length > 0) {
@@ -146,10 +147,11 @@ export class PriceEmpireService {
     }
 
     try {
-      const response = await this.makeRequest('/getAllItems', {
+      const response = await this.makeRequest('/items', {
         search: query,
         currency: 'USD',
-        limit: limit
+        limit: limit,
+        appid: 730
       });
 
       if (response.success && response.data) {
@@ -173,10 +175,10 @@ export class PriceEmpireService {
     }
 
     try {
-      const response = await this.makeRequest('/getAllItems', {
+      const response = await this.makeRequest('/items', {
         currency: 'USD',
         limit: limit,
-        game: 'csgo' // CS2 items are still under 'csgo' in most APIs
+        appid: 730 // CS2 items are still under app ID 730
       });
 
       if (response.success && response.data) {
@@ -253,19 +255,20 @@ export class PriceEmpireService {
   private async makeRequest(endpoint: string, params: any): Promise<PriceEmpireResponse> {
     const url = new URL(endpoint, this.config.baseUrl);
     
-    // Add query parameters
+    // Add query parameters including API key
+    url.searchParams.append('token', this.config.apiKey);
+    
     Object.keys(params).forEach(key => {
       if (params[key] !== undefined && params[key] !== null) {
         url.searchParams.append(key, params[key].toString());
       }
     });
 
-    console.log(`🌐 PriceEmpire API Request: ${url.toString()}`);
+    console.log(`🌐 PriceEmpire API Request: ${url.toString().replace(this.config.apiKey, 'API_KEY_HIDDEN')}`);
 
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
         'User-Agent': 'CS2-Derivatives-Platform/1.0',
         'Accept': 'application/json',
         'Content-Type': 'application/json'
@@ -274,16 +277,27 @@ export class PriceEmpireService {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`PriceEmpire API error: ${response.status} ${response.statusText}`, errorText);
       throw new Error(`PriceEmpire API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     
-    // PriceEmpire returns data directly, not wrapped in success/data structure
-    return {
-      success: true,
-      data: Array.isArray(data) ? data : [data]
-    };
+    // Handle different response formats
+    if (Array.isArray(data)) {
+      return {
+        success: true,
+        data: data
+      };
+    } else if (data.success !== undefined) {
+      return data;
+    } else {
+      return {
+        success: true,
+        data: [data]
+      };
+    }
   }
 
   /**
@@ -336,14 +350,21 @@ export class PriceEmpireService {
     try {
       console.log('🧪 Testing PriceEmpire API connection...');
       
-      // Test with a popular skin
-      const price = await this.getSkinPrice('AK-47 | Redline', 'Field-Tested');
-      const isWorking = price !== null && price > 0;
+      // Test with a simple API call first
+      const response = await this.makeRequest('/items', {
+        search: 'AK-47',
+        currency: 'USD',
+        limit: 1,
+        appid: 730
+      });
       
-      console.log(isWorking ? 
-        `✅ PriceEmpire API connection successful! Test price: $${price?.toFixed(2)}` : 
-        '❌ PriceEmpire API connection failed'
-      );
+      const isWorking = Boolean(response.success === true && response.data && response.data.length > 0);
+      
+      if (isWorking) {
+        console.log(`✅ PriceEmpire API connection successful! Found ${response.data?.length || 0} items`);
+      } else {
+        console.log('❌ PriceEmpire API connection failed - no data returned');
+      }
       
       return isWorking;
     } catch (error) {
