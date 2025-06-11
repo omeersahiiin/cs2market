@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        const longPositions = positionCounts.find(p => p.type === 'LONG');
-        const shortPositions = positionCounts.find(p => p.type === 'SHORT');
+        const longPositions = positionCounts.find((p: any) => p.type === 'LONG');
+        const shortPositions = positionCounts.find((p: any) => p.type === 'SHORT');
 
         convergenceData.push({
           skinId: skin.id,
