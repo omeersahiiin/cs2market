@@ -18,11 +18,19 @@ model User {
   orders    Order[]
   positions Position[]
   conditionalOrders ConditionalOrder[]
+  name      String?
+  image     String?
+  
+  // Trade relations
+  buyTrades  Trade[] @relation("BuyerTrades")
+  sellTrades Trade[] @relation("SellerTrades")
+
+  @@map("users")
 }
 
 model Skin {
   id            String    @id @default(cuid())
-  name          String
+  name          String    @unique
   type          String
   rarity        String
   price         Float
@@ -39,6 +47,15 @@ model Skin {
   orders        Order[]
   floatData     FloatData[]
   conditionalOrders ConditionalOrder[]
+  imageUrl      String?
+  description   String?
+  trades        Trade[]
+
+  // Performance indexes for trading
+  @@index([price])
+  @@index([type, rarity])
+  @@index([name])
+  @@map("skins")
 }
 
 model Position {
@@ -57,8 +74,11 @@ model Position {
   skin       Skin     @relation(fields: [skinId], references: [id])
   conditionalOrders ConditionalOrder[]
 
-  @@index([userId])
-  @@index([skinId])
+  // Performance indexes for position management
+  @@index([userId, skinId])
+  @@index([skinId, type])
+  @@index([closedAt, type])
+  @@map("positions")
 }
 
 model Order {
@@ -83,11 +103,14 @@ model Order {
   skin          Skin     @relation(fields: [skinId], references: [id])
   user          User     @relation(fields: [userId], references: [id])
   fills         OrderFill[]
+  trades        Trade[]
 
-  // Indexes for order book queries
-  @@index([skinId, side, status])
-  @@index([skinId, price, createdAt])
+  // Performance indexes for order matching
+  @@index([skinId, status, createdAt])
   @@index([userId, status])
+  @@index([price, side, skinId])
+  @@index([status, orderType, side])
+  @@map("orders")
 }
 
 // New model to track individual fills/executions
@@ -170,4 +193,28 @@ model FloatPriceRange {
   
   @@index([floatDataId])
   @@index([floatMin, floatMax])
+}
+
+model Trade {
+  id        String    @id @default(cuid())
+  buyerId   String
+  sellerId  String
+  skinId    String
+  orderId   String
+  quantity  Int
+  price     Float
+  total     Float
+  createdAt DateTime  @default(now())
+
+  // Relations
+  buyer  User  @relation("BuyerTrades", fields: [buyerId], references: [id])
+  seller User  @relation("SellerTrades", fields: [sellerId], references: [id])
+  skin   Skin  @relation(fields: [skinId], references: [id])
+  order  Order @relation(fields: [orderId], references: [id])
+
+  // Performance indexes for trade history
+  @@index([skinId, createdAt])
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@map("trades")
 }
