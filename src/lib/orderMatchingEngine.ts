@@ -67,7 +67,7 @@ export class OrderMatchingEngine {
     });
 
     const bids = orders
-      .filter(order => order.side === 'BUY')
+      .filter((order: any) => order.side === 'BUY')
       .sort((a, b) => {
         // Sort by price DESC (highest first), then by time ASC (earliest first)
         if (a.price !== b.price) return b.price - a.price;
@@ -85,7 +85,7 @@ export class OrderMatchingEngine {
       }));
 
     const asks = orders
-      .filter(order => order.side === 'SELL')
+      .filter((order: any) => order.side === 'SELL')
       .sort((a, b) => {
         // Sort by price ASC (lowest first), then by time ASC (earliest first)
         if (a.price !== b.price) return a.price - b.price;
