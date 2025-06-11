@@ -370,7 +370,7 @@ export class AdvancedOrderManager {
       }
     });
 
-    return orders.map(order => ({
+    return orders.map((order: any) => ({
       id: order.id,
       userId: order.userId,
       skinId: order.skinId,
