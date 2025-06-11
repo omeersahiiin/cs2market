@@ -1,28 +1,34 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-
-const prisma = new PrismaClient();
+import { PrismaClientSingleton } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/skins - Get all skins with optional query parameters
 export async function GET(request: Request) {
   try {
-    console.log('Attempting to fetch skins...');
+    console.log('🔍 Attempting to fetch skins...');
     
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const order = searchParams.get('order') || 'desc';
     
-    const skins = await prisma.skin.findMany({
-      orderBy: {
-        [sortBy === 'volume24h' ? 'createdAt' : sortBy]: order as 'asc' | 'desc',
+    // Use the robust database connection with retry logic
+    const skins = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.skin.findMany({
+          orderBy: {
+            [sortBy === 'volume24h' ? 'createdAt' : sortBy]: order as 'asc' | 'desc',
+          },
+          take: limit,
+        });
       },
-      take: limit,
-    });
+      'fetch skins'
+    );
+    
+    console.log(`✅ Successfully fetched ${skins.length} skins from database`);
     
     // Enhance skins with market data for analysis
     const enhancedSkins = skins.map((skin: any) => {
@@ -44,30 +50,134 @@ export async function GET(request: Request) {
       };
     });
     
-    console.log('Skins fetched successfully:', enhancedSkins.length);
+    console.log(`📊 Enhanced ${enhancedSkins.length} skins with market data`);
     
     // Return in the format expected by Market Analysis
     return NextResponse.json({
       skins: enhancedSkins,
       total: enhancedSkins.length,
       page: 1,
-      limit: limit
+      limit: limit,
+      success: true
     });
   } catch (error) {
-    console.error('Detailed error fetching skins:', {
+    console.error('❌ Detailed error fetching skins:', {
       error,
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     });
     
+    // If database is completely unavailable, return mock data
+    if (error instanceof Error && (
+      error.message.includes('prepared statement') || 
+      error.message.includes('connection') ||
+      error.message.includes('timeout')
+    )) {
+      console.log('🔄 Database unavailable, returning mock data...');
+      
+      const mockSkins = generateMockSkins(parseInt(new URL(request.url).searchParams.get('limit') || '50'));
+      
+      return NextResponse.json({
+        skins: mockSkins,
+        total: mockSkins.length,
+        page: 1,
+        limit: mockSkins.length,
+        success: true,
+        mock: true,
+        message: 'Using mock data due to database connectivity issues'
+      });
+    }
+    
     return NextResponse.json(
       { 
         error: 'Failed to fetch skins',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        success: false
       },
       { status: 500 }
     );
   }
+}
+
+// Generate mock skins data when database is unavailable
+function generateMockSkins(limit: number) {
+  const mockSkins = [
+    {
+      id: '1',
+      name: 'AK-47 | Redline',
+      type: 'Rifle',
+      rarity: 'Classified',
+      iconPath: '/icons/ak47-redline.png',
+      price: 85.50,
+      wear: 'Field-Tested',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: '2', 
+      name: 'AWP | Dragon Lore',
+      type: 'Sniper Rifle',
+      rarity: 'Contraband',
+      iconPath: '/icons/awp-dragonlore.png',
+      price: 7500.00,
+      wear: 'Field-Tested',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: '3',
+      name: 'M4A4 | Asiimov',
+      type: 'Rifle',
+      rarity: 'Covert',
+      iconPath: '/icons/m4a4-asiimov.png',
+      price: 109.99,
+      wear: 'Field-Tested',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: '4',
+      name: 'AK-47 | Vulcan',
+      type: 'Rifle',
+      rarity: 'Classified',
+      iconPath: '/icons/ak47-vulcan.png',
+      price: 185.75,
+      wear: 'Minimal Wear',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: '5',
+      name: 'AWP | Asiimov',
+      type: 'Sniper Rifle',
+      rarity: 'Covert',
+      iconPath: '/icons/awp-asiimov.png',
+      price: 151.25,
+      wear: 'Field-Tested',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ];
+
+  // Enhance mock skins with market data
+  return mockSkins.slice(0, limit).map((skin: any) => {
+    const baseVolume = getBaseVolumeForSkin(skin.name, skin.rarity);
+    const priceChange24h = calculatePriceChange(parseFloat(skin.price.toString()), skin.rarity);
+    const priceChangePercent = (priceChange24h / parseFloat(skin.price.toString())) * 100;
+    
+    return {
+      ...skin,
+      volume24h: baseVolume + Math.floor(Math.random() * 500),
+      priceChange24h: priceChange24h,
+      priceChangePercent: priceChangePercent,
+      lastTradePrice: parseFloat(skin.price.toString()) * (1 + (Math.random() - 0.5) * 0.02),
+      marketCap: parseFloat(skin.price.toString()) * (baseVolume + Math.floor(Math.random() * 500)),
+      popularity: Math.floor(Math.random() * 40) + 60,
+      float: Math.random() * 0.8 + 0.1,
+      category: getCategoryFromType(skin.type),
+      collection: getCollectionFromName(skin.name)
+    };
+  });
 }
 
 // Helper functions for market data simulation
@@ -146,16 +256,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const skin = await prisma.skin.create({
-      data: {
-        name,
-        type,
-        rarity,
-        iconPath,
-        price: parseFloat(price),
-        wear: wear || 'Factory New',
+    const skin = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.skin.create({
+          data: {
+            name,
+            type,
+            rarity,
+            iconPath,
+            price: parseFloat(price),
+            wear: wear || 'Factory New',
+          },
+        });
       },
-    });
+      'create skin'
+    );
 
     return NextResponse.json(skin);
   } catch (error) {
