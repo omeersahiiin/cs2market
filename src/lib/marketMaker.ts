@@ -212,11 +212,11 @@ export class MarketMaker {
 
     if (!marketMaker) return null;
 
-    const totalOrderValue = marketMaker.orders.reduce((sum, order) => 
+    const totalOrderValue = marketMaker.orders.reduce((sum: number, order) => 
       sum + (order.price * order.remainingQty), 0
     );
 
-    const totalPositionValue = marketMaker.positions.reduce((sum, position) => 
+    const totalPositionValue = marketMaker.positions.reduce((sum: number, position) => 
       sum + (position.entryPrice * position.size), 0
     );
 
