@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     });
     
     // Enhance skins with market data for analysis
-    const enhancedSkins = skins.map(skin => {
+    const enhancedSkins = skins.map((skin: any) => {
       const baseVolume = getBaseVolumeForSkin(skin.name, skin.rarity);
       const priceChange24h = calculatePriceChange(parseFloat(skin.price.toString()), skin.rarity);
       const priceChangePercent = (priceChange24h / parseFloat(skin.price.toString())) * 100;
