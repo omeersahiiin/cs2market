@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const marginUtilization = 75.0; // Percentage of available margin being used
     
     // Transform risk metrics to include user email (mock for now)
-    const enhancedRiskMetrics = riskMetrics.map(metrics => ({
+    const enhancedRiskMetrics = riskMetrics.map((metrics: any) => ({
       ...metrics,
       userEmail: `user-${metrics.userId.slice(-8)}@example.com` // Mock email
     }));

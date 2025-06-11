@@ -272,7 +272,7 @@ export class PriceService {
    */
   async getAllWearPrices(skinName: string): Promise<Record<string, number>> {
     const wears = ['Factory New', 'Minimal Wear', 'Field-Tested', 'Well-Worn', 'Battle-Scarred'];
-    const pricePromises = wears.map(wear => this.fetchSkinPrice(skinName, wear));
+    const pricePromises = wears.map((wear: any) => this.fetchSkinPrice(skinName, wear));
     const results = await Promise.allSettled(pricePromises);
     
     const wearPrices: Record<string, number> = {};
@@ -293,7 +293,7 @@ export class PriceService {
    * Fetch prices for multiple skins (with their specific wear)
    */
   async fetchMultipleSkinPrices(skinData: Array<{name: string, wear: string}>): Promise<Record<string, number>> {
-    const pricePromises = skinData.map(skin => this.fetchSkinPrice(skin.name, skin.wear));
+    const pricePromises = skinData.map((skin: any) => this.fetchSkinPrice(skin.name, skin.wear));
     const results = await Promise.allSettled(pricePromises);
     
     const prices: Record<string, number> = {};

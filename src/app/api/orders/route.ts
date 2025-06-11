@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
 
     // Handle multiple status values separated by commas
-    const statusFilter = status ? status.split(',').map(s => s.trim()) : undefined;
+    const statusFilter = status ? status.split(',').map((s: any) => s.trim()) : undefined;
 
     const orders = await prisma.order.findMany({
       where: {

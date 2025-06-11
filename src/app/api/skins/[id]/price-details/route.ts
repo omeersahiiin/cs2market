@@ -58,7 +58,7 @@ export async function GET(
           averageMarketPrice: averageMarketPrice,
           lastUpdated: priceInfo.lastUpdated.toISOString(),
           confidence: priceInfo.confidence,
-          sources: priceInfo.prices.map(p => p.platform)
+          sources: priceInfo.prices.map((p: any) => p.platform)
         },
         wearAnalysis: {
           allWearPrices: allWearPrices,

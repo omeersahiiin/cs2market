@@ -218,7 +218,7 @@ export class PriceEmpireService {
       console.log(`📊 Updating ${skins.length} skins via PriceEmpire`);
 
       // Prepare batch request
-      const skinRequests = skins.map(skin => ({
+      const skinRequests = skins.map((skin: any) => ({
         name: skin.name,
         wear: skin.wear
       }));

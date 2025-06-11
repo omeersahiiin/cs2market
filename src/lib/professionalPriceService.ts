@@ -405,7 +405,7 @@ export class ProfessionalPriceService {
     const wears = ['Factory New', 'Minimal Wear', 'Field-Tested', 'Well-Worn', 'Battle-Scarred'];
     
     // Fetch prices for all wears with staggered timing to avoid rate limits
-    const pricePromises = wears.map(async (wear, index) => {
+    const pricePromises = wears.map(async (wear: any, index: number) => {
       // Stagger requests by 500ms each to avoid overwhelming APIs
       await new Promise(resolve => setTimeout(resolve, index * 500));
       const priceInfo = await this.fetchSkinPrice(skinName, wear);
@@ -448,7 +448,7 @@ export class ProfessionalPriceService {
         dmarket: !!process.env.DMARKET_API_KEY
       },
       lastRequests: Object.fromEntries(
-        Object.entries(lastRequests).map(([platform, timestamp]) => [
+        Object.entries(lastRequests).map(([platform, timestamp]: any) => [
           platform, 
           new Date(timestamp).toLocaleTimeString()
         ])

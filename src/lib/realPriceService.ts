@@ -309,7 +309,7 @@ export class RealPriceService {
     console.log(`🎯 Fetching all wear prices for ${skinName}...`);
     
     // Fetch all wears in parallel for faster response
-    const pricePromises = wears.map(wear => this.fetchSkinPrice(skinName, wear));
+    const pricePromises = wears.map((wear: any) => this.fetchSkinPrice(skinName, wear));
     const results = await Promise.allSettled(pricePromises);
     
     const wearPrices: Record<string, number> = {};
