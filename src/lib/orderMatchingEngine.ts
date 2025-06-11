@@ -68,12 +68,12 @@ export class OrderMatchingEngine {
 
     const bids = orders
       .filter((order: any) => order.side === 'BUY')
-      .sort((a, b) => {
+      .sort((a: any, b: any) => {
         // Sort by price DESC (highest first), then by time ASC (earliest first)
         if (a.price !== b.price) return b.price - a.price;
         return a.createdAt.getTime() - b.createdAt.getTime();
       })
-      .map(order => ({
+      .map((order: any) => ({
         id: order.id,
         userId: order.userId,
         price: order.price,
@@ -86,12 +86,12 @@ export class OrderMatchingEngine {
 
     const asks = orders
       .filter((order: any) => order.side === 'SELL')
-      .sort((a, b) => {
+      .sort((a: any, b: any) => {
         // Sort by price ASC (lowest first), then by time ASC (earliest first)
         if (a.price !== b.price) return a.price - b.price;
         return a.createdAt.getTime() - b.createdAt.getTime();
       })
-      .map(order => ({
+      .map((order: any) => ({
         id: order.id,
         userId: order.userId,
         price: order.price,
@@ -211,8 +211,8 @@ export class OrderMatchingEngine {
     // For market orders, if they don't fill completely, cancel the remaining quantity
     if (order.orderType === 'MARKET' && matchResult.fills.length > 0) {
       const totalFilled = matchResult.fills
-        .filter(fill => fill.buyOrderId === newOrder.id || fill.sellOrderId === newOrder.id)
-        .reduce((sum, fill) => sum + fill.quantity, 0);
+        .filter((fill: any) => fill.buyOrderId === newOrder.id || fill.sellOrderId === newOrder.id)
+        .reduce((sum: number, fill: any) => sum + fill.quantity, 0);
       
       if (totalFilled < order.quantity) {
         // Cancel the unfilled portion of the market order
@@ -339,8 +339,8 @@ export class OrderMatchingEngine {
             remainingQty: update.newRemainingQty,
             filledQty: {
               increment: fills
-                .filter(f => f.buyOrderId === update.orderId || f.sellOrderId === update.orderId)
-                .reduce((sum, f) => sum + f.quantity, 0)
+                .filter((f: any) => f.buyOrderId === update.orderId || f.sellOrderId === update.orderId)
+                .reduce((sum: number, f: any) => sum + f.quantity, 0)
             },
             status: update.status,
             filledAt: update.status === 'FILLED' ? new Date() : undefined
@@ -422,13 +422,13 @@ export class OrderMatchingEngine {
 
     // Convert to arrays and limit to specified levels
     const bids = Array.from(bidMap.entries())
-      .map(([price, data]) => ({ price, ...data }))
-      .sort((a, b) => b.price - a.price) // Highest price first
+      .map(([price, data]: any) => ({ price, ...data }))
+      .sort((a: any, b: any) => b.price - a.price) // Highest price first
       .slice(0, levels);
 
     const asks = Array.from(askMap.entries())
-      .map(([price, data]) => ({ price, ...data }))
-      .sort((a, b) => a.price - b.price) // Lowest price first
+      .map(([price, data]: any) => ({ price, ...data }))
+      .sort((a: any, b: any) => a.price - b.price) // Lowest price first
       .slice(0, levels);
 
     return { bids, asks };
