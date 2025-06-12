@@ -10,14 +10,14 @@ export async function POST(
   { params }: { params: { skinId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions);
     
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
-    }
+  }
 
     const { positionId } = await request.json();
 
@@ -32,54 +32,54 @@ export async function POST(
     const position = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.position.findFirst({
-          where: {
+    where: {
             id: positionId,
             userId: session.user.id,
-            skinId: params.skinId,
+      skinId: params.skinId,
             closedAt: null
-          },
+    },
           include: {
             skin: true
           }
-        });
+  });
       },
       'find position to close'
     );
 
-    if (!position) {
+  if (!position) {
       return NextResponse.json(
         { error: 'Position not found or already closed' },
         { status: 404 }
       );
-    }
+  }
 
-    // Calculate P&L
+  // Calculate P&L
     const currentPrice = parseFloat(position.skin.price.toString());
     const entryPrice = parseFloat(position.entryPrice.toString());
     const size = parseFloat(position.size.toString());
     
-    let pnl = 0;
-    if (position.type === 'LONG') {
+  let pnl = 0;
+  if (position.type === 'LONG') {
       pnl = (currentPrice - entryPrice) * size;
-    } else {
+  } else {
       pnl = (entryPrice - currentPrice) * size;
-    }
+  }
 
     // Close position and update user balance
     const [closedPosition] = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.$transaction([
-          prisma.position.update({
+    prisma.position.update({
             where: { id: positionId },
-            data: {
+      data: {
               closedAt: new Date(),
               exitPrice: currentPrice
             }
-          }),
-          prisma.user.update({
-            where: { id: session.user.id },
-            data: {
-              balance: {
+    }),
+    prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        balance: {
                 increment: pnl + position.margin // Return margin plus P&L
               }
             }

@@ -31,7 +31,7 @@ export async function POST() {
           await PrismaClientSingleton.executeWithRetry(
             async (prisma) => {
               return await prisma.skin.update({
-                where: { id: skin.id },
+            where: { id: skin.id },
                 data: { 
                   price: newPrice,
                   updatedAt: new Date()
@@ -52,7 +52,7 @@ export async function POST() {
     }
 
     console.log(`🎉 Price update complete: ${updatedCount}/${skins.length} skins updated`);
-
+    
     return NextResponse.json({
       success: true,
       message: `Updated ${updatedCount} out of ${skins.length} skins`,
@@ -110,12 +110,12 @@ export async function GET() {
                 await PrismaClientSingleton.executeWithRetry(
                   async (prisma) => {
                     return await prisma.skin.update({
-                      where: { id: skin.id },
+                  where: { id: skin.id },
                       data: { 
                         price: realPrice,
                         updatedAt: new Date()
                       }
-                    });
+                });
                   },
                   `update price for ${skin.name}`
                 );

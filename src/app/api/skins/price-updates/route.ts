@@ -17,14 +17,14 @@ export async function GET() {
             rarity: true,
             price: true,
             updatedAt: true
-          }
+                }
         });
       },
       'fetch recent skin price updates'
     );
 
     return NextResponse.json(skins);
-  } catch (error) {
+          } catch (error) {
     console.error('Error fetching price updates:', error);
     return NextResponse.json(
       { error: 'Failed to fetch price updates' },

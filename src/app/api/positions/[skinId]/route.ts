@@ -11,26 +11,26 @@ export async function GET(
   { params }: { params: { skinId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
+  const session = await getServerSession(authOptions);
+  
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
-    }
+  }
 
     const positions = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.position.findMany({
-          where: {
-            skinId: params.skinId,
+      where: {
+        skinId: params.skinId,
             userId: session.user.id
-          },
-          include: {
+      },
+      include: {
             skin: true
-          },
-          orderBy: {
+      },
+      orderBy: {
             createdAt: 'desc'
           }
         });

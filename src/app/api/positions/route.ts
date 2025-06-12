@@ -32,12 +32,12 @@ export async function POST(request: Request) {
     const existingPosition = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.position.findFirst({
-          where: {
-            skinId,
-            userId: session.user.id,
-            closedAt: null,
-          },
-        });
+      where: {
+        skinId,
+        userId: session.user.id,
+        closedAt: null,
+      },
+    });
       },
       'fetch existing position'
     );
@@ -50,9 +50,9 @@ export async function POST(request: Request) {
     const user = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.user.findUnique({
-          where: { id: session.user.id },
-          select: { balance: true },
-        });
+      where: { id: session.user.id },
+      select: { balance: true },
+    });
       },
       'fetch user balance'
     );
@@ -73,21 +73,21 @@ export async function POST(request: Request) {
     const [position] = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.$transaction([
-          prisma.position.create({
-            data: {
-              skinId,
-              userId: session.user.id,
-              type,
-              entryPrice,
-              size,
-              margin: requiredMargin,
-            },
-          }),
-          prisma.user.update({
-            where: { id: session.user.id },
-            data: { balance: { decrement: requiredMargin } },
-          }),
-        ]);
+      prisma.position.create({
+        data: {
+          skinId,
+          userId: session.user.id,
+          type,
+          entryPrice,
+          size,
+          margin: requiredMargin,
+        },
+      }),
+      prisma.user.update({
+        where: { id: session.user.id },
+        data: { balance: { decrement: requiredMargin } },
+      }),
+    ]);
       },
       'create position and update balance'
     );
@@ -102,25 +102,25 @@ export async function POST(request: Request) {
 // GET /api/positions - Get all positions for the authenticated user
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
+  const session = await getServerSession(authOptions);
+  
     if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
-    }
+  }
 
     const positions = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.position.findMany({
-          where: {
+      where: {
             userId: session.user.id
-          },
-          include: {
+      },
+      include: {
             skin: true
-          },
-          orderBy: {
+      },
+      orderBy: {
             createdAt: 'desc'
           }
         });
