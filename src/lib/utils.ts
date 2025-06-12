@@ -11,27 +11,11 @@ export function formatSteamImageUrl(url: string): string {
 
   // If it's a Steam CDN hash (starts with -9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp)
   if (url.startsWith('-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp')) {
-    return `https://steamcommunity-a.akamaihd.net/economy/image/${url}`;
+    return `https://community.cloudflare.steamstatic.com/economy/image/${url}`;
   }
 
-  // If the URL already has the /image suffix, add HTTPS protocol
-  if (url.endsWith('/image')) {
-    return `https://steamcommunity-a.akamaihd.net/economy/image/${url}`;
-  }
-
-  // If the URL has /image.png suffix, add HTTPS protocol
-  if (url.endsWith('/image.png')) {
-    return `https://steamcommunity-a.akamaihd.net/economy/image/${url}`;
-  }
-
-  // If the URL has /360fx360f suffix, remove it and add /image with HTTPS
-  if (url.endsWith('/360fx360f')) {
-    const cleanUrl = url.replace('/360fx360f', '');
-    return `https://steamcommunity-a.akamaihd.net/economy/image/${cleanUrl}`;
-  }
-
-  // For any other case, add HTTPS protocol and /image suffix
-  return `https://steamcommunity-a.akamaihd.net/economy/image/${url}`;
+  // For any other case, add HTTPS protocol and use Cloudflare CDN
+  return `https://community.cloudflare.steamstatic.com/economy/image/${url}`;
 }
 
 /**
@@ -42,14 +26,18 @@ export function getFallbackImageUrl(): string {
 }
 
 /**
- * Primary Steam CDN URL generator with enhanced reliability
+ * Primary Steam CDN URL generator - now uses reliable Cloudflare CDN
  */
 export function getSteamIconUrl(iconPath: string): string {
-  // Handle the new Steam CDN URL format (starts with base64-like string)
-  // All Steam economy images start with this pattern
+  // If it's already a complete URL (from our mapping), return as is
+  if (iconPath.startsWith('https://')) {
+    return iconPath;
+  }
+  
+  // Handle the Steam CDN hash format
   if (iconPath.startsWith('-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp')) {
-    // Use primary Steam CDN (most reliable)
-    return `https://steamcommunity-a.akamaihd.net/economy/image/${iconPath}`;
+    // Use reliable Cloudflare CDN
+    return `https://community.cloudflare.steamstatic.com/economy/image/${iconPath}`;
   }
   
   // Fallback to old format for legacy icon paths
@@ -60,9 +48,14 @@ export function getSteamIconUrl(iconPath: string): string {
  * Get alternative Steam image URL (fallback CDN)
  */
 export function getAlternativeSteamIconUrl(iconPath: string): string {
+  // If it's already a complete URL, try alternative CDN
+  if (iconPath.startsWith('https://community.cloudflare.steamstatic.com/')) {
+    return iconPath.replace('community.cloudflare.steamstatic.com', 'steamcommunity-a.akamaihd.net');
+  }
+  
   if (iconPath.startsWith('-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp')) {
     // Use alternative Steam CDN
-    return `https://community.akamai.steamstatic.com/economy/image/${iconPath}`;
+    return `https://steamcommunity-a.akamaihd.net/economy/image/${iconPath}`;
   }
   
   return `https://steamcdn-a.akamaihd.net/apps/730/icons/econ/default_generated/${iconPath}`;
@@ -72,18 +65,29 @@ export function getAlternativeSteamIconUrl(iconPath: string): string {
  * Get multiple Steam CDN URLs for maximum reliability
  */
 export function getAllSteamIconUrls(iconPath: string): string[] {
+  // If it's already a complete URL, provide alternatives
+  if (iconPath.startsWith('https://')) {
+    return [
+      iconPath,
+      iconPath.replace('community.cloudflare.steamstatic.com', 'steamcommunity-a.akamaihd.net'),
+      iconPath.replace('community.cloudflare.steamstatic.com', 'community.akamai.steamstatic.com'),
+      getFallbackImageUrl()
+    ];
+  }
+  
   if (iconPath.startsWith('-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp')) {
     return [
+      `https://community.cloudflare.steamstatic.com/economy/image/${iconPath}`,
       `https://steamcommunity-a.akamaihd.net/economy/image/${iconPath}`,
       `https://community.akamai.steamstatic.com/economy/image/${iconPath}`,
-      `https://steamuserimages-a.akamaihd.net/ugc/${iconPath}`,
-      `https://steamcdn-a.akamaihd.net/economy/image/${iconPath}`
+      getFallbackImageUrl()
     ];
   }
   
   return [
     `https://steamcdn-a.akamaihd.net/apps/730/icons/econ/default_generated/${iconPath}`,
-    `https://steamcommunity-a.akamaihd.net/economy/image/${iconPath}`
+    `https://steamcommunity-a.akamaihd.net/economy/image/${iconPath}`,
+    getFallbackImageUrl()
   ];
 }
 
@@ -124,6 +128,11 @@ export function createImageWithFallback(
  * Validate if a Steam icon path is in the correct format
  */
 export function isValidSteamIconPath(iconPath: string): boolean {
+  // Check for complete URL
+  if (iconPath.startsWith('https://')) {
+    return iconPath.includes('steamstatic.com') || iconPath.includes('akamaihd.net');
+  }
+  
   // Check for modern Steam CDN format
   if (iconPath.startsWith('-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp')) {
     return iconPath.length > 100; // Modern hashes are quite long
@@ -138,6 +147,11 @@ export function isValidSteamIconPath(iconPath: string): boolean {
  */
 export function getSteamIconUrlWithSize(iconPath: string, size: '96fx96f' | '128fx128f' | '256fx256f' | '360fx360f' = '256fx256f'): string {
   const baseUrl = getSteamIconUrl(iconPath);
+  
+  // For complete URLs, we can't modify the size easily
+  if (iconPath.startsWith('https://')) {
+    return baseUrl;
+  }
   
   // For modern Steam CDN URLs, we can append size parameters
   if (iconPath.startsWith('-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp')) {
