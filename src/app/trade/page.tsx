@@ -182,21 +182,58 @@ export default function TradePage() {
     });
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!selectedSkin || !session) return;
     
-    // Mock order placement
-    console.log('Placing order:', {
-      skin: selectedSkin.name,
-      ...orderForm
-    });
-    
-    // Reset form
-    setOrderForm(prev => ({
-      ...prev,
-      quantity: 1,
-      total: prev.price
-    }));
+    try {
+      console.log('Placing order:', {
+        skin: selectedSkin.name,
+        ...orderForm
+      });
+
+      const orderData = {
+        skinId: selectedSkin.id,
+        side: orderForm.side.toUpperCase(),
+        orderType: orderForm.type.toUpperCase(),
+        positionType: orderForm.side === 'buy' ? 'LONG' : 'SHORT',
+        price: orderForm.type === 'limit' ? orderForm.price : undefined,
+        quantity: orderForm.quantity,
+        timeInForce: 'GTC'
+      };
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to place order');
+      }
+
+      const result = await response.json();
+      console.log('Order placed successfully:', result);
+
+      // Show success message
+      alert(`Order placed successfully! Order ID: ${result.order.id}`);
+      
+      // Reset form
+      setOrderForm(prev => ({
+        ...prev,
+        quantity: 1,
+        total: prev.price
+      }));
+
+      // Trigger refresh of order book and trades
+      handleOrderPlaced();
+
+    } catch (error) {
+      console.error('Error placing order:', error);
+      alert(`Failed to place order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleOrderPlaced = () => {

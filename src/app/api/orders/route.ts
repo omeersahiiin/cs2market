@@ -1,84 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { PrismaClient, Prisma } from '@prisma/client';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
-import { shouldUseMockData, MOCK_SKINS } from '@/lib/mock-data';
+import { shouldUseMockData, MOCK_SKINS, addMockOrder, addMockTrade } from '@/lib/mock-data';
 
-const prisma = new PrismaClient();
+// Conditional Prisma imports for when database is available
+let prisma: any = null;
+let Prisma: any = null;
+
+try {
+  const { PrismaClient, Prisma: PrismaTypes } = require('@prisma/client');
+  prisma = new PrismaClient();
+  Prisma = PrismaTypes;
+} catch (error) {
+  console.log('Prisma not available, using mock mode');
+}
 
 export const dynamic = 'force-dynamic';
 
-// Mock orders data
-const MOCK_ORDERS = [
-  {
-    id: 'order-1',
-    userId: 'mock-user-1',
-    skinId: 'skin-1',
-    side: 'BUY',
-    orderType: 'LIMIT',
-    positionType: 'LONG',
-    price: 7400.00,
-    quantity: 1,
-    remainingQty: 0.5,
-    status: 'PARTIALLY_FILLED',
-    timeInForce: 'GTC',
-    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
-    updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // Updated 15 minutes ago
-    skin: MOCK_SKINS[0], // AWP Dragon Lore
-    fills: [
-      {
-        id: 'fill-1',
-        orderId: 'order-1',
-        price: 7400.00,
-        quantity: 0.5,
-        createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
-      }
-    ]
-  },
-  {
-    id: 'order-2',
-    userId: 'mock-user-1',
-    skinId: 'skin-2',
-    side: 'SELL',
-    orderType: 'LIMIT',
-    positionType: 'SHORT',
-    price: 1300.00,
-    quantity: 3,
-    remainingQty: 3,
-    status: 'OPEN',
-    timeInForce: 'GTC',
-    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
-    updatedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    skin: MOCK_SKINS[1], // AK-47 Fire Serpent
-    fills: []
-  },
-  {
-    id: 'order-3',
-    userId: 'mock-user-1',
-    skinId: 'skin-3',
-    side: 'BUY',
-    orderType: 'MARKET',
-    positionType: 'LONG',
-    price: null,
-    quantity: 5,
-    remainingQty: 0,
-    status: 'FILLED',
-    timeInForce: 'IOC',
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    skin: MOCK_SKINS[2], // AWP Asiimov
-    fills: [
-      {
-        id: 'fill-2',
-        orderId: 'order-3',
-        price: 151.25,
-        quantity: 5,
-        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-      }
-    ]
-  }
-];
+// Mock orders data - this will be populated dynamically
+let MOCK_ORDERS: any[] = [];
 
 // GET /api/orders - Get user's orders
 export async function GET(request: NextRequest) {
@@ -176,12 +117,19 @@ export async function POST(request: NextRequest) {
 
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('Creating mock order');
+      console.log('Creating mock order:', { skinId, side, orderType, positionType, price, quantity });
       
       // Find the skin
       const skin = MOCK_SKINS.find(s => s.id === skinId);
       if (!skin) {
         return NextResponse.json({ error: 'Skin not found' }, { status: 404 });
+      }
+
+      // Determine execution price for market orders
+      let executionPrice = price;
+      if (orderType === 'MARKET') {
+        // For market orders, use current market price with slight slippage
+        executionPrice = skin.price * (side === 'BUY' ? 1.001 : 0.999); // 0.1% slippage
       }
 
       // Create mock order
@@ -192,26 +140,42 @@ export async function POST(request: NextRequest) {
         side,
         orderType,
         positionType,
-        price: orderType === 'LIMIT' ? price : null,
+        price: executionPrice,
         quantity,
-        remainingQty: quantity,
-        status: 'OPEN',
+        remainingQty: orderType === 'MARKET' ? 0 : quantity, // Market orders fill immediately
+        status: orderType === 'MARKET' ? 'FILLED' : 'OPEN',
         timeInForce: timeInForce || 'GTC',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         skin,
-        fills: []
+        fills: orderType === 'MARKET' ? [{
+          id: `fill-${Date.now()}`,
+          orderId: `order-${Date.now()}`,
+          price: executionPrice,
+          quantity: quantity,
+          createdAt: new Date().toISOString()
+        }] : []
       };
 
-      // Add to mock orders (in a real app, this would be stored)
+      // Add to mock orders
       MOCK_ORDERS.push(newOrder);
+      
+      // Add to mock order book system
+      addMockOrder(newOrder);
+
+      // If market order, create a trade
+      if (orderType === 'MARKET') {
+        addMockTrade(skinId, executionPrice, quantity, side.toLowerCase() as 'buy' | 'sell');
+      }
+
+      console.log('Mock order created successfully:', newOrder.id);
 
       return NextResponse.json({
         order: newOrder,
         matchResult: {
-          fills: [],
-          remainingQuantity: quantity,
-          status: 'OPEN'
+          fills: newOrder.fills,
+          remainingQuantity: newOrder.remainingQty,
+          status: newOrder.status
         }
       });
     }
@@ -263,7 +227,7 @@ export async function POST(request: NextRequest) {
 
     // If order was filled (fully or partially), create positions and update balance
     if (result.matchResult.fills.length > 0) {
-      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await prisma.$transaction(async (tx: any) => {
         // Calculate total filled quantity and average fill price
         const userFills = result.matchResult.fills.filter(
           fill => fill.buyUserId === user.id || fill.sellUserId === user.id

@@ -42,102 +42,79 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
   const [price, setPrice] = useState(currentPrice);
   const [loading, setLoading] = useState(false);
 
-  // Generate mock order book data
+  // Fetch real order book data from API
   useEffect(() => {
-    const generateOrderBook = () => {
-      if (!currentPrice || currentPrice <= 0) return;
-      
-      const bidOrders: OrderBookEntry[] = [];
-      const askOrders: OrderBookEntry[] = [];
-      
-      // Generate bids (buy orders) - prices below current price
-      for (let i = 0; i < 15; i++) {
-        const price = currentPrice - (i + 1) * (currentPrice * 0.001); // 0.1% steps down
-        const quantity = Math.floor(Math.random() * 10) + 1;
-        const total = price * quantity;
+    const fetchOrderBook = async () => {
+      try {
+        const response = await fetch(`/api/orderbook/${skinId}`);
+        if (!response.ok) throw new Error('Failed to fetch order book');
         
-        bidOrders.push({ price, quantity, total });
-      }
-      
-      // Generate asks (sell orders) - prices above current price
-      for (let i = 0; i < 15; i++) {
-        const price = currentPrice + (i + 1) * (currentPrice * 0.001); // 0.1% steps up
-        const quantity = Math.floor(Math.random() * 10) + 1;
-        const total = price * quantity;
+        const data = await response.json();
         
-        askOrders.push({ price, quantity, total });
-      }
-      
-      // Calculate spread
-      const bestBid = bidOrders[0]?.price || 0;
-      const bestAsk = askOrders[0]?.price || 0;
-      const spreadValue = bestAsk - bestBid;
-      const spreadPercentValue = currentPrice > 0 ? (spreadValue / currentPrice) * 100 : 0;
-      
-      setBids(bidOrders);
-      setAsks(askOrders);
-      setSpread(spreadValue);
-      setSpreadPercent(spreadPercentValue);
-      
-      // Update market price if callback provided
-      if (onMarketPriceUpdate && currentPrice > 0) {
-        onMarketPriceUpdate(currentPrice);
+        setBids(data.orderBook.bids || []);
+        setAsks(data.orderBook.asks || []);
+        
+        // Calculate spread
+        const bestBid = data.bestPrices?.bestBid || 0;
+        const bestAsk = data.bestPrices?.bestAsk || 0;
+        const spreadValue = bestAsk - bestBid;
+        const marketPrice = data.marketPrice || currentPrice;
+        const spreadPercentValue = marketPrice > 0 ? (spreadValue / marketPrice) * 100 : 0;
+        
+        setSpread(spreadValue);
+        setSpreadPercent(spreadPercentValue);
+        
+        // Update market price if callback provided
+        if (onMarketPriceUpdate && marketPrice > 0) {
+          onMarketPriceUpdate(marketPrice);
+        }
+      } catch (error) {
+        console.error('Error fetching order book:', error);
       }
     };
 
-    generateOrderBook();
-    
-    // Update order book every 5 seconds
-    const interval = setInterval(generateOrderBook, 5000);
-    return () => clearInterval(interval);
+    if (skinId) {
+      fetchOrderBook();
+      
+      // Update order book every 5 seconds
+      const interval = setInterval(fetchOrderBook, 5000);
+      return () => clearInterval(interval);
+    }
   }, [skinId, currentPrice, onMarketPriceUpdate]);
 
-  // Generate mock trades data
+  // Fetch real trades data from API
   useEffect(() => {
-    const generateTrades = () => {
-      const mockTrades: Trade[] = [];
-      const basePrice = currentPrice || 1000;
-      
-      for (let i = 0; i < 21; i++) {
-        const timestamp = new Date(Date.now() - i * 60000); // 1 minute intervals
-        const priceVariation = (Math.random() - 0.5) * 0.02; // ±1% variation
-        const price = basePrice * (1 + priceVariation);
-        const quantity = Math.floor(Math.random() * 5) + 1;
-        const side = Math.random() > 0.5 ? 'buy' : 'sell';
+    const fetchTrades = async () => {
+      try {
+        const response = await fetch(`/api/trades/${skinId}?limit=20`);
+        if (!response.ok) throw new Error('Failed to fetch trades');
         
-        mockTrades.push({
-          id: `trade-${i}`,
-          price,
-          quantity,
-          side,
-          timestamp: timestamp.toISOString(),
-          total: price * quantity
-        });
+        const data = await response.json();
+        
+        // Transform API data to match component interface
+        const formattedTrades = data.trades.map((trade: any) => ({
+          id: trade.id,
+          price: trade.price,
+          quantity: trade.quantity,
+          side: trade.side,
+          timestamp: trade.timestamp,
+          total: trade.price * trade.quantity
+        }));
+        
+        setTrades(formattedTrades);
+      } catch (error) {
+        console.error('Error fetching trades:', error);
       }
-      
-      setTrades(mockTrades);
     };
 
-    generateTrades();
-    
-    // Update trades every 10 seconds
-    const interval = setInterval(() => {
-      // Add a new trade at the beginning
-      const newTrade: Trade = {
-        id: `trade-${Date.now()}`,
-        price: (currentPrice || 1000) * (1 + (Math.random() - 0.5) * 0.02),
-        quantity: Math.floor(Math.random() * 5) + 1,
-        side: Math.random() > 0.5 ? 'buy' : 'sell',
-        timestamp: new Date().toISOString(),
-        total: 0
-      };
-      newTrade.total = newTrade.price * newTrade.quantity;
+    if (skinId) {
+      fetchTrades();
       
-      setTrades(prev => [newTrade, ...prev.slice(0, 20)]);
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [skinId, currentPrice]);
+      // Update trades every 10 seconds
+      const interval = setInterval(fetchTrades, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [skinId]);
 
   // Update price when currentPrice changes
   useEffect(() => {

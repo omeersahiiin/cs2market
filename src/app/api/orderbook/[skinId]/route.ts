@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
-import { shouldUseMockData, MOCK_ORDER_BOOK } from '@/lib/mock-data';
+import { shouldUseMockData, getMockOrderBook } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,29 +16,31 @@ export async function GET(
 
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('Using mock order book data');
+      console.log('Using dynamic mock order book data for skin:', skinId);
       
-      // Return mock order book data
+      // Get dynamic mock order book data
+      const mockOrderBook = getMockOrderBook(skinId);
+      
       return NextResponse.json({
-        orderBook: MOCK_ORDER_BOOK,
+        orderBook: mockOrderBook,
         orderBookDepth: {
-          bids: MOCK_ORDER_BOOK.bids.slice(0, levels).map(bid => ({
+          bids: mockOrderBook.bids.slice(0, levels).map(bid => ({
             price: bid.price,
             quantity: bid.quantity,
             orders: 1
           })),
-          asks: MOCK_ORDER_BOOK.asks.slice(0, levels).map(ask => ({
+          asks: mockOrderBook.asks.slice(0, levels).map(ask => ({
             price: ask.price,
             quantity: ask.quantity,
             orders: 1
           }))
         },
         bestPrices: {
-          bestBid: MOCK_ORDER_BOOK.bids[0]?.price,
-          bestAsk: MOCK_ORDER_BOOK.asks[0]?.price,
-          spread: MOCK_ORDER_BOOK.asks[0]?.price - MOCK_ORDER_BOOK.bids[0]?.price
+          bestBid: mockOrderBook.bids[0]?.price || 0,
+          bestAsk: mockOrderBook.asks[0]?.price || 0,
+          spread: (mockOrderBook.asks[0]?.price || 0) - (mockOrderBook.bids[0]?.price || 0)
         },
-        marketPrice: (MOCK_ORDER_BOOK.asks[0]?.price + MOCK_ORDER_BOOK.bids[0]?.price) / 2,
+        marketPrice: ((mockOrderBook.asks[0]?.price || 0) + (mockOrderBook.bids[0]?.price || 0)) / 2,
         timestamp: new Date().toISOString()
       });
     }

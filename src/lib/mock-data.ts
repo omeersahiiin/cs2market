@@ -1,4 +1,13 @@
 // Mock data system for when database is unavailable
+
+// Global state for mock data (in a real app, this would be in a database)
+let mockOrdersState: any[] = [];
+let mockTradesState: any[] = [];
+let mockOrderBookState = {
+  bids: [] as any[],
+  asks: [] as any[]
+};
+
 export const MOCK_USERS = [
   {
     id: 'mock-user-1',
@@ -408,40 +417,158 @@ function generatePriceHistory(basePrice: number, hours: number) {
   return history;
 }
 
-export const MOCK_ORDER_BOOK = {
-  bids: [
-    { price: 7492.50, quantity: 2, total: 14985.00 },
-    { price: 7485.00, quantity: 6, total: 44910.00 },
-    { price: 7477.50, quantity: 8, total: 59820.00 },
-    { price: 7470.00, quantity: 2, total: 14940.00 },
-    { price: 7462.50, quantity: 6, total: 44775.00 },
-    { price: 7455.00, quantity: 6, total: 44730.00 },
-    { price: 7447.50, quantity: 8, total: 59580.00 },
-    { price: 7440.00, quantity: 6, total: 44640.00 },
-    { price: 7432.50, quantity: 9, total: 66892.50 },
-    { price: 7425.00, quantity: 2, total: 14850.00 }
-  ],
-  asks: [
-    { price: 7507.50, quantity: 2, total: 15015.00 },
-    { price: 7515.00, quantity: 3, total: 22545.00 },
-    { price: 7522.50, quantity: 5, total: 37612.50 },
-    { price: 7530.00, quantity: 8, total: 60240.00 },
-    { price: 7537.50, quantity: 6, total: 45225.00 },
-    { price: 7545.00, quantity: 2, total: 15090.00 },
-    { price: 7552.50, quantity: 4, total: 30210.00 },
-    { price: 7560.00, quantity: 10, total: 75600.00 },
-    { price: 7567.50, quantity: 1, total: 7567.50 },
-    { price: 7575.00, quantity: 8, total: 60600.00 }
-  ]
-};
+// Dynamic mock order book that updates with new orders
+function generateDynamicOrderBook(skinId: string) {
+  const skin = MOCK_SKINS.find(s => s.id === skinId);
+  if (!skin) return { bids: [], asks: [] };
 
-export const MOCK_RECENT_TRADES = [
-  { price: 7500.00, quantity: 1, timestamp: new Date(Date.now() - 30000).toISOString(), side: 'buy' },
-  { price: 7498.50, quantity: 2, timestamp: new Date(Date.now() - 45000).toISOString(), side: 'sell' },
-  { price: 7501.25, quantity: 1, timestamp: new Date(Date.now() - 60000).toISOString(), side: 'buy' },
-  { price: 7499.75, quantity: 3, timestamp: new Date(Date.now() - 90000).toISOString(), side: 'sell' },
-  { price: 7502.00, quantity: 1, timestamp: new Date(Date.now() - 120000).toISOString(), side: 'buy' }
-];
+  const basePrice = skin.price;
+  const spread = basePrice * 0.002; // 0.2% spread
+  
+  // Generate realistic bids (below market price)
+  const bids = [];
+  for (let i = 0; i < 10; i++) {
+    const price = basePrice - spread - (i * basePrice * 0.001);
+    const quantity = Math.floor(Math.random() * 8) + 1;
+    bids.push({
+      price: Math.round(price * 100) / 100,
+      quantity,
+      total: Math.round(price * quantity * 100) / 100
+    });
+  }
+
+  // Generate realistic asks (above market price)
+  const asks = [];
+  for (let i = 0; i < 10; i++) {
+    const price = basePrice + spread + (i * basePrice * 0.001);
+    const quantity = Math.floor(Math.random() * 8) + 1;
+    asks.push({
+      price: Math.round(price * 100) / 100,
+      quantity,
+      total: Math.round(price * quantity * 100) / 100
+    });
+  }
+
+  return { bids, asks };
+}
+
+// Dynamic recent trades that update with new orders
+function generateRecentTrades(skinId: string) {
+  const skin = MOCK_SKINS.find(s => s.id === skinId);
+  if (!skin) return [];
+
+  const basePrice = skin.price;
+  const trades = [];
+  
+  for (let i = 0; i < 20; i++) {
+    const priceVariation = (Math.random() - 0.5) * 0.02; // ±1% variation
+    const price = basePrice * (1 + priceVariation);
+    const quantity = Math.floor(Math.random() * 5) + 1;
+    const side = Math.random() > 0.5 ? 'buy' : 'sell';
+    const timestamp = new Date(Date.now() - (i * 30000) - Math.random() * 30000).toISOString();
+    
+    trades.push({
+      id: `trade-${Date.now()}-${i}`,
+      price: Math.round(price * 100) / 100,
+      quantity,
+      timestamp,
+      side
+    });
+  }
+  
+  return trades.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
+// Add a new trade to the mock trades state
+export function addMockTrade(skinId: string, price: number, quantity: number, side: 'buy' | 'sell') {
+  const trade = {
+    id: `trade-${Date.now()}`,
+    skinId,
+    price,
+    quantity,
+    timestamp: new Date().toISOString(),
+    side
+  };
+  
+  mockTradesState.unshift(trade); // Add to beginning
+  
+  // Keep only last 50 trades
+  if (mockTradesState.length > 50) {
+    mockTradesState = mockTradesState.slice(0, 50);
+  }
+  
+  return trade;
+}
+
+// Add a new order to the mock order book
+export function addMockOrder(order: any) {
+  mockOrdersState.push(order);
+  
+  // Update order book based on new order
+  updateMockOrderBook(order.skinId);
+  
+  return order;
+}
+
+// Update the mock order book when orders are placed
+function updateMockOrderBook(skinId: string) {
+  const openOrders = mockOrdersState.filter(order => 
+    order.skinId === skinId && 
+    order.status === 'OPEN' && 
+    order.remainingQty > 0
+  );
+  
+  const bids = openOrders
+    .filter(order => order.side === 'BUY')
+    .sort((a, b) => b.price - a.price) // Highest price first
+    .slice(0, 10)
+    .map(order => ({
+      price: order.price,
+      quantity: order.remainingQty,
+      total: order.price * order.remainingQty
+    }));
+    
+  const asks = openOrders
+    .filter(order => order.side === 'SELL')
+    .sort((a, b) => a.price - b.price) // Lowest price first
+    .slice(0, 10)
+    .map(order => ({
+      price: order.price,
+      quantity: order.remainingQty,
+      total: order.price * order.remainingQty
+    }));
+  
+  // Fill in with generated data if not enough real orders
+  const dynamicBook = generateDynamicOrderBook(skinId);
+  
+  mockOrderBookState = {
+    bids: [...bids, ...dynamicBook.bids].slice(0, 10),
+    asks: [...asks, ...dynamicBook.asks].slice(0, 10)
+  };
+}
+
+// Get current mock order book
+export function getMockOrderBook(skinId: string) {
+  if (mockOrderBookState.bids.length === 0) {
+    updateMockOrderBook(skinId);
+  }
+  return mockOrderBookState;
+}
+
+// Get recent trades for a skin
+export function getMockRecentTrades(skinId: string) {
+  const skinTrades = mockTradesState.filter(trade => trade.skinId === skinId);
+  
+  if (skinTrades.length < 5) {
+    // Generate some initial trades if none exist
+    const generatedTrades = generateRecentTrades(skinId);
+    mockTradesState.push(...generatedTrades);
+  }
+  
+  return mockTradesState
+    .filter(trade => trade.skinId === skinId)
+    .slice(0, 20);
+}
 
 export const MOCK_FLOAT_ANALYSIS = {
   floatValue: 0.15234567,
