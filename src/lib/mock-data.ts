@@ -28,14 +28,18 @@ export const MOCK_SKINS = [
     id: 'skin-1',
     name: 'AWP | Dragon Lore',
     type: 'Sniper Rifle',
-    rarity: 'Covert',
+    rarity: 'Contraband',
     wear: 'Field-Tested',
     price: 7500.00,
-    iconPath: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17P7NdTRH-t26q4SZlvD7PYTQgXtu5Mx2gv2P9o6migzl_Us5ZmCmLYDDJgU9NA6B81S5yezvg8e-7cycnXJgvHZx5WGdwUJqz1Tl4g',
+    iconPath: '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17P7NdTRH-t26q4SZlvD7PYTQgXtu5Mx2gv2P9o6migzl_Us5ZmCmLYDDJgU9NA6B81S5yezvg8e-7cycnXJgvHZx5WGdwUJqz1Tl4g',
     priceChange: 170.1,
     priceChangePercent: 2.3,
     volume24h: 1250000,
     marketCap: 45000000,
+    category: 'Sniper',
+    collection: 'Cobblestone Collection',
+    float: 0.25,
+    popularity: 95,
     tradingData: {
       currentPrice: 7500.00,
       dayHigh: 7650.00,
@@ -51,11 +55,15 @@ export const MOCK_SKINS = [
     rarity: 'Classified',
     wear: 'Minimal Wear',
     price: 185.75,
-    iconPath: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5lpKKqPrxN7LEmyVQ7MEpiLuSrYmnjQO3-UdsZGHyd4_Bd1RvNQ7T_FDrw-_ng5Pu75iY1zI97bhJJJJJ',
+    iconPath: '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5lpKKqPrxN7LEmyVQ7MEpiLuSrYmnjQO3-UdsZGHyd4_Bd1RvNQ7T_FDrw-_ng5Pu75iY1zI97bhJJJJJ',
     priceChange: -17.1,
     priceChangePercent: -9.2,
     volume24h: 850000,
     marketCap: 12000000,
+    category: 'Rifle',
+    collection: 'Operation Breakout Collection',
+    float: 0.08,
+    popularity: 88,
     tradingData: {
       currentPrice: 185.75,
       dayHigh: 195.50,
@@ -71,11 +79,15 @@ export const MOCK_SKINS = [
     rarity: 'Covert',
     wear: 'Field-Tested',
     price: 151.25,
-    iconPath: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17P7NdTRH-t26q4SZlvD7PYTQgXtu5Mx2gv2P9o6migzl_Us5ZmCmLYDDJgU9NA6B81S5yezvg8e-7cycnXJgvHZx5WGdwUJqz1Tl4g',
+    iconPath: '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17P7NdTRH-t26q4SZlvD7PYTQgXtu5Mx2gv2P9o6migzl_Us5ZmCmLYDDJgU9NA6B81S5yezvg8e-7cycnXJgvHZx5WGdwUJqz1Tl4g',
     priceChange: 4.4,
     priceChangePercent: 2.9,
     volume24h: 650000,
     marketCap: 8500000,
+    category: 'Sniper',
+    collection: 'Phoenix Collection',
+    float: 0.35,
+    popularity: 92,
     tradingData: {
       currentPrice: 151.25,
       dayHigh: 155.00,
@@ -91,11 +103,15 @@ export const MOCK_SKINS = [
     rarity: 'Covert',
     wear: 'Field-Tested',
     price: 109.99,
-    iconPath: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpou-6kejhjxszFJQJD_9W7m5a0mvLwOq7c2GlUucFwjruR9t7231DmrRc_NW7yItCRcVNoYVHS-APrwbzu0JK-78nXiSw0EnwDRM0',
+    iconPath: '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpou-6kejhjxszFJQJD_9W7m5a0mvLwOq7c2GlUucFwjruR9t7231DmrRc_NW7yItCRcVNoYVHS-APrwbzu0JK-78nXiSw0EnwDRM0',
     priceChange: -3.5,
     priceChangePercent: -3.2,
     volume24h: 420000,
     marketCap: 6200000,
+    category: 'Rifle',
+    collection: 'Phoenix Collection',
+    float: 0.28,
+    popularity: 85,
     tradingData: {
       currentPrice: 109.99,
       dayHigh: 115.50,
@@ -111,11 +127,15 @@ export const MOCK_SKINS = [
     rarity: 'Covert',
     wear: 'Factory New',
     price: 2850.00,
-    iconPath: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf0ebcZThQ6tOlq4GGqPP7IYTck29Y_chOhuDG_Zi72gzj-kVpMGGhJoaVcVU3aV7V_1K9wOjxxcjrJJJJJJJJ',
+    iconPath: '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf0ebcZThQ6tOlq4GGqPP7IYTck29Y_chOhuDG_Zi72gzj-kVpMGGhJoaVcVU3aV7V_1K9wOjxxcjrJJJJJJJJ',
     priceChange: 125.0,
     priceChangePercent: 4.6,
     volume24h: 2100000,
     marketCap: 35000000,
+    category: 'Knife',
+    collection: 'Dust Collection',
+    float: 0.01,
+    popularity: 98,
     tradingData: {
       currentPrice: 2850.00,
       dayHigh: 2920.00,
@@ -203,8 +223,17 @@ export const MOCK_WEAR_ANALYSIS = {
 
 // Helper function to check if we should use mock data
 export function shouldUseMockData(): boolean {
+  // Check if we're in a browser environment
+  if (typeof window !== 'undefined') {
+    // In browser, always use mock data for now (since database is down)
+    return true;
+  }
+  
+  // Server-side check
   return process.env.USE_MOCK_DATA === 'true' || 
-         process.env.NODE_ENV === 'development';
+         process.env.NODE_ENV === 'development' ||
+         !process.env.DATABASE_URL ||
+         process.env.DATABASE_URL.includes('mock');
 }
 
 // Mock authentication
