@@ -9,6 +9,14 @@ let mockOrderBookState = {
   asks: [] as any[]
 };
 
+// Reset mock order book to only show real orders
+export function resetMockOrderBook() {
+  mockOrderBookState = {
+    bids: [],
+    asks: []
+  };
+}
+
 export const MOCK_USERS = [
   {
     id: 'mock-user-1',
@@ -539,31 +547,17 @@ function updateMockOrderBook(skinId: string) {
       total: order.price * order.remainingQty
     }));
   
-  // Only add minimal liquidity if there are very few real orders
-  let finalBids = bids;
-  let finalAsks = asks;
-  
-  if (bids.length < 2) {
-    const dynamicBook = generateDynamicOrderBook(skinId);
-    finalBids = [...bids, ...dynamicBook.bids.slice(0, 2)];
-  }
-  
-  if (asks.length < 2) {
-    const dynamicBook = generateDynamicOrderBook(skinId);
-    finalAsks = [...asks, ...dynamicBook.asks.slice(0, 2)];
-  }
-  
+  // Only show real user orders - no generated liquidity
   mockOrderBookState = {
-    bids: finalBids.slice(0, 10),
-    asks: finalAsks.slice(0, 10)
+    bids: bids,
+    asks: asks
   };
 }
 
 // Get current mock order book
 export function getMockOrderBook(skinId: string) {
-  if (mockOrderBookState.bids.length === 0) {
-    updateMockOrderBook(skinId);
-  }
+  // Always update with real orders only
+  updateMockOrderBook(skinId);
   return mockOrderBookState;
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
-import { shouldUseMockData, getMockOrderBook } from '@/lib/mock-data';
+import { shouldUseMockData, getMockOrderBook, resetMockOrderBook } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +16,9 @@ export async function GET(
 
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('Using dynamic mock order book data for skin:', skinId);
+      console.log('Using real orders only for skin:', skinId);
       
-      // Get dynamic mock order book data
+      // Get only real user orders
       const mockOrderBook = getMockOrderBook(skinId);
       
       return NextResponse.json({
