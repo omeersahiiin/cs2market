@@ -1,56 +1,56 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { shouldUseMockData, MOCK_USERS } from '@/lib/mock-data';
 
-const prisma = new PrismaClient();
+// Conditional Prisma import
+let PrismaClient: any;
+let prisma: any = null;
 
-export async function POST() {
+try {
+  if (!shouldUseMockData()) {
+    const PrismaModule = require('@prisma/client');
+    PrismaClient = PrismaModule.PrismaClient;
+    prisma = new PrismaClient();
+  }
+} catch (error) {
+  console.log('Prisma not available, using mock data');
+  prisma = null;
+}
+
+export async function POST(request: Request) {
   try {
-    const email = 'omeersahiiin8@gmail.com';
-    const username = 'omeersahiiin';
-    const password = 'b60ctvoybj';
+    const { email, password, username } = await request.json();
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { username }
-        ]
-      }
-    });
-
-    if (existingUser) {
-      return NextResponse.json(
-        { message: 'Test user already exists' },
-        { status: 400 }
-      );
+    // If using mock data, just return success
+    if (shouldUseMockData() || !prisma) {
+      console.log('🎭 Using mock data for user creation');
+      return NextResponse.json({ 
+        message: 'Mock user created successfully',
+        user: { email, username, id: 'mock-user-' + Date.now() }
+      });
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create test user
+    // Create user
     const user = await prisma.user.create({
       data: {
         email,
-        username,
         password: hashedPassword,
-        balance: 10000, // Starting balance for testing
-      },
+        username,
+        balance: 10000.0
+      }
     });
 
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json({
-      message: 'Test user created successfully',
-      user: userWithoutPassword
-    }, { status: 201 });
+    return NextResponse.json({ 
+      message: 'User created successfully',
+      user: { id: user.id, email: user.email, username: user.username }
+    });
   } catch (error) {
-    console.error('Test user creation error:', error);
+    console.error('Error creating user:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { error: 'Failed to create user' },
       { status: 500 }
     );
   }
