@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import ProfessionalPriceService from '@/lib/professionalPriceService';
+import { shouldUseMockData, MOCK_SKINS } from '@/lib/mock-data';
 
 const prisma = new PrismaClient();
 
@@ -11,6 +12,72 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log('Using mock price details data');
+      
+      // Find the mock skin
+      const skin = MOCK_SKINS.find(s => s.id === params.id);
+      if (!skin) {
+        return NextResponse.json(
+          { error: 'Skin not found' },
+          { status: 404 }
+        );
+      }
+
+      // Create mock price details based on the skin
+      const basePrice = skin.price;
+      const allWearPrices = {
+        'Factory New': basePrice * 1.4,
+        'Minimal Wear': basePrice * 1.2,
+        'Field-Tested': basePrice,
+        'Well-Worn': basePrice * 0.8,
+        'Battle-Scarred': basePrice * 0.6
+      };
+
+      const mockPriceDetails = {
+        tradingPrice: {
+          averageMarketPrice: basePrice,
+          lastUpdated: new Date().toISOString(),
+          confidence: 95,
+          sources: ['Steam Market', 'CSFloat', 'Buff163']
+        },
+        wearAnalysis: {
+          allWearPrices: allWearPrices,
+          priceRange: {
+            lowest: Math.min(...Object.values(allWearPrices)),
+            highest: Math.max(...Object.values(allWearPrices)),
+            spread: ((Math.max(...Object.values(allWearPrices)) - Math.min(...Object.values(allWearPrices))) / Math.min(...Object.values(allWearPrices))) * 100
+          }
+        },
+        marketData: {
+          volume24h: Math.floor(Math.random() * 500) + 100,
+          priceChange24h: (Math.random() - 0.5) * 0.1, // Random ±5% change
+          lastTradePrice: basePrice * (1 + (Math.random() - 0.5) * 0.02), // ±1% from average
+          realTimeData: true,
+          apiSources: 3
+        }
+      };
+
+      return NextResponse.json({
+        skin: {
+          id: skin.id,
+          name: skin.name,
+          type: skin.type,
+          rarity: skin.rarity,
+          wear: skin.wear,
+          currentPrice: basePrice
+        },
+        priceDetails: mockPriceDetails
+      }, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+    }
+
     const skin = await prisma.skin.findUnique({
       where: {
         id: params.id

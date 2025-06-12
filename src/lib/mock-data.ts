@@ -464,19 +464,10 @@ export const MOCK_WEAR_ANALYSIS = {
   priceImpact: '+5.2%'
 };
 
-// Helper function to check if we should use mock data
+// Function to determine if we should use mock data
 export function shouldUseMockData(): boolean {
-  // Check if we're in a browser environment
-  if (typeof window !== 'undefined') {
-    // In browser, always use mock data for now (since database is down)
-    return true;
-  }
-  
-  // Server-side check
-  return process.env.USE_MOCK_DATA === 'true' || 
-         process.env.NODE_ENV === 'development' ||
-         !process.env.DATABASE_URL ||
-         process.env.DATABASE_URL.includes('mock');
+  // Always use mock data for now since we don't have a database set up
+  return true;
 }
 
 // Mock authentication

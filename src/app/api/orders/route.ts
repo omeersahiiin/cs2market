@@ -3,10 +3,82 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PrismaClient, Prisma } from '@prisma/client';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
+import { shouldUseMockData, MOCK_SKINS } from '@/lib/mock-data';
 
 const prisma = new PrismaClient();
 
 export const dynamic = 'force-dynamic';
+
+// Mock orders data
+const MOCK_ORDERS = [
+  {
+    id: 'order-1',
+    userId: 'mock-user-1',
+    skinId: 'skin-1',
+    side: 'BUY',
+    orderType: 'LIMIT',
+    positionType: 'LONG',
+    price: 7400.00,
+    quantity: 1,
+    remainingQty: 0.5,
+    status: 'PARTIALLY_FILLED',
+    timeInForce: 'GTC',
+    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
+    updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // Updated 15 minutes ago
+    skin: MOCK_SKINS[0], // AWP Dragon Lore
+    fills: [
+      {
+        id: 'fill-1',
+        orderId: 'order-1',
+        price: 7400.00,
+        quantity: 0.5,
+        createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+      }
+    ]
+  },
+  {
+    id: 'order-2',
+    userId: 'mock-user-1',
+    skinId: 'skin-2',
+    side: 'SELL',
+    orderType: 'LIMIT',
+    positionType: 'SHORT',
+    price: 1300.00,
+    quantity: 3,
+    remainingQty: 3,
+    status: 'OPEN',
+    timeInForce: 'GTC',
+    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
+    updatedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    skin: MOCK_SKINS[1], // AK-47 Fire Serpent
+    fills: []
+  },
+  {
+    id: 'order-3',
+    userId: 'mock-user-1',
+    skinId: 'skin-3',
+    side: 'BUY',
+    orderType: 'MARKET',
+    positionType: 'LONG',
+    price: null,
+    quantity: 5,
+    remainingQty: 0,
+    status: 'FILLED',
+    timeInForce: 'IOC',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    skin: MOCK_SKINS[2], // AWP Asiimov
+    fills: [
+      {
+        id: 'fill-2',
+        orderId: 'order-3',
+        price: 151.25,
+        quantity: 5,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      }
+    ]
+  }
+];
 
 // GET /api/orders - Get user's orders
 export async function GET(request: NextRequest) {
@@ -14,6 +86,31 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log('Using mock orders data');
+      
+      const { searchParams } = new URL(request.url);
+      const skinId = searchParams.get('skinId');
+      const status = searchParams.get('status');
+      
+      // Handle multiple status values separated by commas
+      const statusFilter = status ? status.split(',').map((s: any) => s.trim()) : undefined;
+      
+      // Filter mock orders
+      let filteredOrders = MOCK_ORDERS.filter(order => order.userId === session.user.id);
+      
+      if (skinId) {
+        filteredOrders = filteredOrders.filter(order => order.skinId === skinId);
+      }
+      
+      if (statusFilter) {
+        filteredOrders = filteredOrders.filter(order => statusFilter.includes(order.status));
+      }
+      
+      return NextResponse.json({ orders: filteredOrders });
     }
 
     const user = await prisma.user.findUnique({
@@ -59,14 +156,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     const body = await request.json();
     const { skinId, side, orderType, positionType, price, quantity, timeInForce } = body;
 
@@ -83,6 +172,56 @@ export async function POST(request: NextRequest) {
     // Validate quantity
     if (quantity <= 0) {
       return NextResponse.json({ error: 'Quantity must be positive' }, { status: 400 });
+    }
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log('Creating mock order');
+      
+      // Find the skin
+      const skin = MOCK_SKINS.find(s => s.id === skinId);
+      if (!skin) {
+        return NextResponse.json({ error: 'Skin not found' }, { status: 404 });
+      }
+
+      // Create mock order
+      const newOrder = {
+        id: `order-${Date.now()}`,
+        userId: session.user.id,
+        skinId,
+        side,
+        orderType,
+        positionType,
+        price: orderType === 'LIMIT' ? price : null,
+        quantity,
+        remainingQty: quantity,
+        status: 'OPEN',
+        timeInForce: timeInForce || 'GTC',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        skin,
+        fills: []
+      };
+
+      // Add to mock orders (in a real app, this would be stored)
+      MOCK_ORDERS.push(newOrder);
+
+      return NextResponse.json({
+        order: newOrder,
+        matchResult: {
+          fills: [],
+          remainingQuantity: quantity,
+          status: 'OPEN'
+        }
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Check if skin exists
