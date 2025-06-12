@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { PrismaClient, Prisma } from '@prisma/client';
-import OrderMatchingEngine from '@/lib/orderMatchingEngine';
-import { shouldUseMockData, MOCK_ORDER_BOOK } from '@/lib/mock-data';
+// Conditional Prisma imports for when database is available
+let PrismaClient: any = null;
+let Prisma: any = null;
 
-const prisma = new PrismaClient();
+try {
+  const prismaModule = require('@prisma/client');
+  PrismaClient = prismaModule.PrismaClient;
+  Prisma = prismaModule.Prisma;
+} catch (error) {
+  console.log('Prisma not available, using mock mode');
+}
+import OrderMatchingEngine from '@/lib/orderMatchingEngine';
+import { shouldUseMockData, getMockOrderBook } from '@/lib/mock-data';
+
+const prisma = PrismaClient ? new PrismaClient() : null;
 
 export const dynamic = 'force-dynamic';
 
@@ -76,13 +86,16 @@ export async function POST(
       const body = await request.json();
       const { orderType = 'MARKET', price } = body;
 
+      // Get mock order book
+      const mockOrderBook = getMockOrderBook(skinId);
+      
       // Find mock position
       const mockPosition = {
         id: 'pos-1',
         userId: session.user.id,
         skinId,
         type: 'LONG',
-        entryPrice: MOCK_ORDER_BOOK.bids[0].price,
+        entryPrice: mockOrderBook.bids[0]?.price || 1000,
         size: 2,
         margin: 500,
         createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
@@ -96,7 +109,7 @@ export async function POST(
 
       // For market orders, use current market price
       const exitPrice = orderType === 'MARKET' 
-        ? (MOCK_ORDER_BOOK.asks[0].price + MOCK_ORDER_BOOK.bids[0].price) / 2
+        ? ((mockOrderBook.asks[0]?.price || 1000) + (mockOrderBook.bids[0]?.price || 1000)) / 2
         : price;
 
       // Calculate PnL

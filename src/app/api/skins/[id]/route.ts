@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClientSingleton } from '@/lib/prisma';
-import { MOCK_SKINS, MOCK_ORDER_BOOK, MOCK_RECENT_TRADES, MOCK_FLOAT_ANALYSIS, MOCK_WEAR_ANALYSIS, shouldUseMockData } from '@/lib/mock-data';
+import { MOCK_SKINS, getMockOrderBook, getMockRecentTrades, MOCK_FLOAT_ANALYSIS, MOCK_WEAR_ANALYSIS, shouldUseMockData } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,8 +8,9 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const { id } = params;
+  
   try {
-    const { id } = params;
 
     // Check if we should use mock data first
     if (shouldUseMockData()) {
@@ -18,8 +19,8 @@ export async function GET(
       
       return NextResponse.json({
         ...mockSkin,
-        orderBook: MOCK_ORDER_BOOK,
-        recentTrades: MOCK_RECENT_TRADES,
+        orderBook: getMockOrderBook(id),
+        recentTrades: getMockRecentTrades(id),
         floatAnalysis: MOCK_FLOAT_ANALYSIS,
         wearAnalysis: MOCK_WEAR_ANALYSIS
       });
@@ -70,11 +71,11 @@ export async function GET(
     console.error('Database connection failed, falling back to mock data:', error);
     
     // Fallback to mock data if database fails
-    const mockSkin = MOCK_SKINS[0]; // Default to first skin
+    const mockSkin = MOCK_SKINS.find(skin => skin.id === id) || MOCK_SKINS[0];
     return NextResponse.json({
       ...mockSkin,
-      orderBook: MOCK_ORDER_BOOK,
-      recentTrades: MOCK_RECENT_TRADES,
+      orderBook: getMockOrderBook(mockSkin.id),
+      recentTrades: getMockRecentTrades(mockSkin.id),
       floatAnalysis: MOCK_FLOAT_ANALYSIS,
       wearAnalysis: MOCK_WEAR_ANALYSIS
     });
