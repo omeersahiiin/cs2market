@@ -229,11 +229,6 @@ export default function TradePage() {
 
       // Trigger refresh of order book and trades
       handleOrderPlaced();
-      
-      // Refresh the page to show updated data
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
 
     } catch (error) {
       console.error('Error placing order:', error);

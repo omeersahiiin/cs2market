@@ -619,8 +619,8 @@ export const MOCK_WEAR_ANALYSIS = {
 
 // Function to determine if we should use mock data
 export function shouldUseMockData(): boolean {
-  // Always use mock data for now since we don't have a database set up
-  return true;
+  // Switch to real database - no more mock data
+  return false;
 }
 
 // Mock authentication

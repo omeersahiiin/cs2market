@@ -292,11 +292,6 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
       await fetchUserOrders();
       router.refresh();
       
-      // Refresh the page to show updated data
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-      
     } catch (err) {
       console.error('Error placing order from skins page:', err);
       setError(err instanceof Error ? err.message : 'Failed to place order');

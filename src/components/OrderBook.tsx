@@ -170,11 +170,6 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
       setQuantity(1);
       setPrice(currentPrice);
       
-      // Refresh order book and trades
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-      
     } catch (error) {
       console.error('Error placing order:', error);
       alert(`Failed to place order: ${error instanceof Error ? error.message : 'Unknown error'}`);
