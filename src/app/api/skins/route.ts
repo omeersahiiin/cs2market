@@ -2,12 +2,19 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PrismaClientSingleton } from '@/lib/prisma';
+import { MOCK_SKINS, shouldUseMockData } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/skins - Get all skins with optional query parameters
 export async function GET(request: Request) {
   try {
+    // Check if we should use mock data first
+    if (shouldUseMockData()) {
+      console.log('🎭 Using mock data for skins API');
+      return NextResponse.json(MOCK_SKINS);
+    }
+
     console.log('🔍 Attempting to fetch skins...');
     
     const { searchParams } = new URL(request.url);
@@ -62,7 +69,15 @@ export async function GET(request: Request) {
         popularity: Math.floor(Math.random() * 40) + 60,
         float: Math.random() * 0.8 + 0.1,
         category: getCategoryFromType(skin.type),
-        collection: getCollectionFromName(skin.name)
+        collection: getCollectionFromName(skin.name),
+        priceChange: (Math.random() - 0.5) * parseFloat(skin.price.toString()) * 0.1,
+        tradingData: {
+          currentPrice: parseFloat(skin.price.toString()),
+          dayHigh: parseFloat(skin.price.toString()) * (1 + Math.random() * 0.05),
+          dayLow: parseFloat(skin.price.toString()) * (1 - Math.random() * 0.05),
+          volume: Math.floor(Math.random() * 200) + 10,
+          priceHistory: generateMockPriceHistory(parseFloat(skin.price.toString()), 24)
+        }
       };
     });
     
@@ -178,7 +193,15 @@ function generateMockSkins(limit: number) {
       popularity: Math.floor(Math.random() * 40) + 60,
       float: Math.random() * 0.8 + 0.1,
       category: getCategoryFromType(skin.type),
-      collection: getCollectionFromName(skin.name)
+      collection: getCollectionFromName(skin.name),
+      priceChange: (Math.random() - 0.5) * parseFloat(skin.price.toString()) * 0.1,
+      tradingData: {
+        currentPrice: parseFloat(skin.price.toString()),
+        dayHigh: parseFloat(skin.price.toString()) * (1 + Math.random() * 0.05),
+        dayLow: parseFloat(skin.price.toString()) * (1 - Math.random() * 0.05),
+        volume: Math.floor(Math.random() * 200) + 10,
+        priceHistory: generateMockPriceHistory(parseFloat(skin.price.toString()), 24)
+      }
     };
   });
 }
@@ -234,6 +257,24 @@ function getCollectionFromName(name: string): string {
   if (name.includes('Vulcan') || name.includes('Orion')) return 'Operation Breakout Collection';
   if (name.includes('Fade')) return 'Dust Collection';
   return 'Unknown Collection';
+}
+
+function generateMockPriceHistory(basePrice: number, hours: number) {
+  const history = [];
+  let currentPrice = basePrice;
+  
+  for (let i = hours; i >= 0; i--) {
+    const change = (Math.random() - 0.5) * 0.04; // ±2%
+    currentPrice = currentPrice * (1 + change);
+    
+    history.push({
+      timestamp: new Date(Date.now() - i * 60 * 60 * 1000).toISOString(),
+      price: Math.round(currentPrice * 100) / 100,
+      volume: Math.floor(Math.random() * 50) + 10
+    });
+  }
+  
+  return history;
 }
 
 // POST /api/skins - Create a new skin (admin only)
