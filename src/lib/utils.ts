@@ -45,8 +45,8 @@ export function getSteamIconUrl(iconPath: string): string {
   // Handle the new Steam CDN URL format (starts with base64-like string)
   // All Steam economy images start with this pattern
   if (iconPath.startsWith('-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgp')) {
-    // Try Cloudflare CDN first (more reliable)
-    return `https://community.cloudflare.steamstatic.com/economy/image/${iconPath}`;
+    // Use Steam CDN directly (more reliable than Cloudflare)
+    return `https://steamcommunity-a.akamaihd.net/economy/image/${iconPath}`;
   }
   
   // Fallback to old format for legacy icon paths

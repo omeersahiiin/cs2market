@@ -143,6 +143,30 @@ export const MOCK_SKINS = [
       volume: 23,
       priceHistory: generatePriceHistory(2850.00, 24)
     }
+  },
+  {
+    id: 'skin-6',
+    name: 'AK-47 | Redline',
+    type: 'Rifle',
+    rarity: 'Classified',
+    wear: 'Field-Tested',
+    price: 85.50,
+    iconPath: '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV08-5lpKKqPrxN7LEmyVQ7MEpiLuSrYmnjQO3-UdsZGHyd4_Bd1RvNQ7T_FDrw-_ng5Pu75iY1zI97bhJJJJJ',
+    priceChange: 2.1,
+    priceChangePercent: 2.5,
+    volume24h: 420000,
+    marketCap: 3500000,
+    category: 'Rifle',
+    collection: 'Phoenix Collection',
+    float: 0.22,
+    popularity: 82,
+    tradingData: {
+      currentPrice: 85.50,
+      dayHigh: 88.00,
+      dayLow: 83.25,
+      volume: 78,
+      priceHistory: generatePriceHistory(85.50, 24)
+    }
   }
 ];
 

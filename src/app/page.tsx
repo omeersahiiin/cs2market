@@ -290,7 +290,11 @@ export default function HomePage() {
                         className="object-contain group-hover:scale-110 transition-transform duration-300"
                         sizes="(max-width: 768px) 100vw, 33vw"
                         onError={(e) => {
+                          console.log('Image failed to load:', getSteamIconUrl(skin.iconPath));
                           (e.target as HTMLImageElement).src = getFallbackImageUrl();
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully:', getSteamIconUrl(skin.iconPath));
                         }}
                       />
                       <div className="absolute top-4 right-4">
