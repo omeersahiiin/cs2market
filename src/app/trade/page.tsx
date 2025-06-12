@@ -229,6 +229,11 @@ export default function TradePage() {
 
       // Trigger refresh of order book and trades
       handleOrderPlaced();
+      
+      // Refresh the page to show updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
 
     } catch (error) {
       console.error('Error placing order:', error);
@@ -561,9 +566,9 @@ export default function TradePage() {
                 {/* Buy/Long and Sell/Short Buttons - Bottom */}
                 <div className="grid grid-cols-2 gap-3 pt-4">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       handleOrderFormChange('side', 'buy');
-                      handlePlaceOrder();
+                      await handlePlaceOrder();
                     }}
                     disabled={!selectedSkin || orderForm.quantity <= 0 || ((orderForm.type === 'limit' || orderForm.type === 'stop') && orderForm.price <= 0)}
                     className="py-4 px-4 rounded-lg font-semibold text-base transition-colors bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
@@ -571,9 +576,9 @@ export default function TradePage() {
                     Buy/Long
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       handleOrderFormChange('side', 'sell');
-                      handlePlaceOrder();
+                      await handlePlaceOrder();
                     }}
                     disabled={!selectedSkin || orderForm.quantity <= 0 || ((orderForm.type === 'limit' || orderForm.type === 'stop') && orderForm.price <= 0)}
                     className="py-4 px-4 rounded-lg font-semibold text-base transition-colors bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"

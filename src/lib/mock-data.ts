@@ -3,6 +3,7 @@
 // Global state for mock data (in a real app, this would be in a database)
 let mockOrdersState: any[] = [];
 let mockTradesState: any[] = [];
+let mockPositionsState: any[] = [];
 let mockOrderBookState = {
   bids: [] as any[],
   asks: [] as any[]
@@ -538,12 +539,23 @@ function updateMockOrderBook(skinId: string) {
       total: order.price * order.remainingQty
     }));
   
-  // Fill in with generated data if not enough real orders
-  const dynamicBook = generateDynamicOrderBook(skinId);
+  // Only add minimal liquidity if there are very few real orders
+  let finalBids = bids;
+  let finalAsks = asks;
+  
+  if (bids.length < 2) {
+    const dynamicBook = generateDynamicOrderBook(skinId);
+    finalBids = [...bids, ...dynamicBook.bids.slice(0, 2)];
+  }
+  
+  if (asks.length < 2) {
+    const dynamicBook = generateDynamicOrderBook(skinId);
+    finalAsks = [...asks, ...dynamicBook.asks.slice(0, 2)];
+  }
   
   mockOrderBookState = {
-    bids: [...bids, ...dynamicBook.bids].slice(0, 10),
-    asks: [...asks, ...dynamicBook.asks].slice(0, 10)
+    bids: finalBids.slice(0, 10),
+    asks: finalAsks.slice(0, 10)
   };
 }
 
@@ -605,4 +617,17 @@ export function mockAuthenticate(email: string, password: string) {
     return userWithoutPassword;
   }
   return null;
+}
+
+// Add a new position to the mock positions state
+export function addMockPosition(position: any) {
+  mockPositionsState.push(position);
+  return position;
+}
+
+// Get user positions
+export function getMockPositions(userId: string) {
+  return mockPositionsState.filter(position => 
+    position.userId === userId && !position.closedAt
+  );
 } 

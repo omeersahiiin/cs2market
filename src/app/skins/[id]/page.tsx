@@ -250,29 +250,56 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
     setError(null);
     
     try {
-      const response = await fetch('/api/positions', {
+      console.log('Placing order from skins page:', {
+        skinId: skin.id,
+        side: type === 'LONG' ? 'BUY' : 'SELL',
+        orderType,
+        positionType: type,
+        price: finalEntryPrice,
+        quantity: positionSize,
+      });
+
+      const response = await fetch('/api/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           skinId: skin.id,
-          type,
-          entryPrice: finalEntryPrice,
-          size: positionSize,
+          side: type === 'LONG' ? 'BUY' : 'SELL',
+          orderType,
+          positionType: type,
+          price: orderType === 'MARKET' ? undefined : finalEntryPrice,
+          quantity: positionSize,
+          timeInForce: 'GTC'
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(errorData || 'Failed to open position');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to place order');
       }
 
-      const data = await response.json();
+      const result = await response.json();
+      console.log('Order placed successfully from skins page:', result);
+      
+      // Show success message
+      alert(`Order placed successfully! Order ID: ${result.order.id}`);
+      
+      // Refresh data
       await fetchPositions();
+      await fetchUserOrders();
       router.refresh();
+      
+      // Refresh the page to show updated data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open position');
+      console.error('Error placing order from skins page:', err);
+      setError(err instanceof Error ? err.message : 'Failed to place order');
+      alert(`Failed to place order: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setPositionLoading(false);
     }

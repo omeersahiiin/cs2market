@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { PrismaClientSingleton } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
-import { shouldUseMockData, MOCK_SKINS } from '@/lib/mock-data';
+import { shouldUseMockData, MOCK_SKINS, getMockPositions, addMockPosition } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,8 +101,8 @@ export async function POST(request: Request) {
         skin
       };
 
-      // Add to mock positions (in a real app, this would be stored)
-      MOCK_POSITIONS.push(newPosition);
+      // Add to mock positions
+      addMockPosition(newPosition);
 
       return NextResponse.json(newPosition);
     }
@@ -194,8 +194,8 @@ export async function GET() {
     if (shouldUseMockData()) {
       console.log('Using mock positions data');
       
-      // Filter positions for the current user
-      const userPositions = MOCK_POSITIONS.filter(pos => pos.userId === session.user.id);
+      // Get positions for the current user
+      const userPositions = getMockPositions(session.user.id);
       
       return NextResponse.json(userPositions);
     }

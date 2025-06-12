@@ -128,6 +128,15 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
     
     setLoading(true);
     try {
+      console.log('Placing order with:', {
+        skinId,
+        side: orderSide,
+        orderType,
+        positionType,
+        price: orderType === 'MARKET' ? currentPrice : price,
+        quantity,
+      });
+
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: {
@@ -140,21 +149,35 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
           positionType,
           price: orderType === 'MARKET' ? currentPrice : price,
           quantity,
+          timeInForce: 'GTC'
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to place order');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to place order');
       }
 
       const result = await response.json();
+      console.log('Order placed successfully:', result);
+      
+      // Show success message
+      alert(`Order placed successfully! Order ID: ${result.order.id}`);
+      
       onOrderPlace(result);
       
       // Reset form
       setQuantity(1);
       setPrice(currentPrice);
+      
+      // Refresh order book and trades
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
     } catch (error) {
       console.error('Error placing order:', error);
+      alert(`Failed to place order: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -244,10 +267,10 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
             {/* Buy/Long and Sell/Short Buttons - Bottom */}
             <div className="grid grid-cols-2 gap-3 pt-4">
               <button
-                onClick={() => {
+                onClick={async () => {
                   setOrderSide('BUY');
                   setPositionType('LONG');
-                  handlePlaceOrder();
+                  await handlePlaceOrder();
                 }}
                 disabled={loading || quantity <= 0 || ((orderType === 'LIMIT' || orderType === 'STOP') && price <= 0)}
                 className="py-4 px-4 rounded-lg font-semibold text-base transition-colors bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
@@ -255,10 +278,10 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
                 {loading && orderSide === 'BUY' ? 'Placing...' : 'Buy/Long'}
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setOrderSide('SELL');
                   setPositionType('SHORT');
-                  handlePlaceOrder();
+                  await handlePlaceOrder();
                 }}
                 disabled={loading || quantity <= 0 || ((orderType === 'LIMIT' || orderType === 'STOP') && price <= 0)}
                 className="py-4 px-4 rounded-lg font-semibold text-base transition-colors bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"

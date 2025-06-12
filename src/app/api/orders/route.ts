@@ -163,9 +163,28 @@ export async function POST(request: NextRequest) {
       // Add to mock order book system
       addMockOrder(newOrder);
 
-      // If market order, create a trade
+      // If market order, create a trade and position
       if (orderType === 'MARKET') {
         addMockTrade(skinId, executionPrice, quantity, side.toLowerCase() as 'buy' | 'sell');
+        
+        // Create position for market orders (they execute immediately)
+        const { addMockPosition } = await import('@/lib/mock-data');
+        const newPosition = {
+          id: `pos-${Date.now()}`,
+          userId: session.user.id,
+          skinId,
+          type: positionType,
+          entryPrice: executionPrice,
+          size: quantity,
+          margin: executionPrice * quantity * 0.2, // 20% margin
+          createdAt: new Date().toISOString(),
+          closedAt: null,
+          exitPrice: null,
+          skin
+        };
+        
+        addMockPosition(newPosition);
+        console.log('Created mock position:', newPosition.id);
       }
 
       console.log('Mock order created successfully:', newOrder.id);
