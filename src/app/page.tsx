@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
-import { getSteamIconUrl, getFallbackImageUrl } from '../lib/utils';
+import { getSteamIconUrl, getFallbackImageUrl, getAlternativeSteamIconUrl, getAllSteamIconUrls } from '../lib/utils';
 
 interface Skin {
   id: string;
@@ -20,6 +20,55 @@ interface MarketStats {
   totalVolume: number;
   activeTraders: number;
   avgPrice: number;
+}
+
+// Enhanced Steam Image Component with fallback support
+interface SteamImageProps {
+  iconPath: string;
+  alt: string;
+  className?: string;
+  sizes?: string;
+}
+
+function SteamImage({ iconPath, alt, className, sizes }: SteamImageProps) {
+  const [currentSrc, setCurrentSrc] = useState(getSteamIconUrl(iconPath));
+  const [hasError, setHasError] = useState(false);
+  const [fallbackIndex, setFallbackIndex] = useState(0);
+
+  const fallbackUrls = getAllSteamIconUrls(iconPath);
+
+  const handleError = () => {
+    console.log('Image failed to load:', currentSrc);
+    
+    if (fallbackIndex < fallbackUrls.length - 1) {
+      const nextIndex = fallbackIndex + 1;
+      setFallbackIndex(nextIndex);
+      setCurrentSrc(fallbackUrls[nextIndex]);
+      console.log('Trying fallback URL:', fallbackUrls[nextIndex]);
+    } else {
+      console.log('All Steam URLs failed, using final fallback');
+      setCurrentSrc(getFallbackImageUrl());
+      setHasError(true);
+    }
+  };
+
+  const handleLoad = () => {
+    console.log('Image loaded successfully:', currentSrc);
+    setHasError(false);
+  };
+
+  return (
+    <Image
+      src={currentSrc}
+      alt={alt}
+      fill
+      className={className}
+      sizes={sizes}
+      onError={handleError}
+      onLoad={handleLoad}
+      priority={false}
+    />
+  );
 }
 
 export default function HomePage() {
@@ -283,19 +332,11 @@ export default function HomePage() {
                 <Link key={skin.id} href={`/skins/${skin.id}`} className="block group">
                   <div className="bg-[#23262F] rounded-2xl overflow-hidden border border-[#2A2D3A] hover:border-blue-500/30 transition-all duration-300 transform hover:scale-105">
                     <div className="relative w-full h-48 bg-[#181A20] flex items-center justify-center overflow-hidden">
-                      <Image
-                        src={getSteamIconUrl(skin.iconPath)}
+                      <SteamImage
+                        iconPath={skin.iconPath}
                         alt={skin.name}
-                        fill
                         className="object-contain group-hover:scale-110 transition-transform duration-300"
                         sizes="(max-width: 768px) 100vw, 33vw"
-                        onError={(e) => {
-                          console.log('Image failed to load:', getSteamIconUrl(skin.iconPath));
-                          (e.target as HTMLImageElement).src = getFallbackImageUrl();
-                        }}
-                        onLoad={() => {
-                          console.log('Image loaded successfully:', getSteamIconUrl(skin.iconPath));
-                        }}
                       />
                       <div className="absolute top-4 right-4">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${

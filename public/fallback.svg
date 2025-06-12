@@ -1,7 +1,39 @@
-<svg width="200" height="150" viewBox="0 0 200 150" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="200" height="150" fill="#F3F4F6"/>
-  <rect x="50" y="37.5" width="100" height="75" rx="8" fill="#E5E7EB"/>
-  <circle cx="75" cy="62.5" r="7.5" fill="#D1D5DB"/>
-  <path d="M65 85L85 65L95 75L115 55L135 75V100H65V85Z" fill="#D1D5DB"/>
-  <text x="100" y="125" text-anchor="middle" fill="#9CA3AF" font-family="Arial, sans-serif" font-size="12">CS2 Skin</text>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="256" height="256" fill="#1A1F2E"/>
+  
+  <!-- Border -->
+  <rect x="8" y="8" width="240" height="240" fill="none" stroke="#2A2D3A" stroke-width="2" rx="12"/>
+  
+  <!-- CS2 Icon -->
+  <g transform="translate(128, 100)">
+    <!-- Gun silhouette -->
+    <path d="M-40 -10 L40 -10 L45 -5 L45 5 L40 10 L-40 10 L-45 5 L-45 -5 Z" fill="#4A5568"/>
+    <rect x="-35" y="-6" width="70" height="12" fill="#2D3748" rx="2"/>
+    <circle cx="35" cy="0" r="3" fill="#1A202C"/>
+    <rect x="-42" y="-3" width="8" height="6" fill="#2D3748" rx="1"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="128" y="140" text-anchor="middle" fill="#718096" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500">
+    CS2 Skin
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="128" y="160" text-anchor="middle" fill="#4A5568" font-family="system-ui, -apple-system, sans-serif" font-size="12">
+    Image Loading...
+  </text>
+  
+  <!-- Loading animation -->
+  <g transform="translate(128, 180)">
+    <circle cx="-12" cy="0" r="2" fill="#4A5568">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" begin="0s"/>
+    </circle>
+    <circle cx="0" cy="0" r="2" fill="#4A5568">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" begin="0.5s"/>
+    </circle>
+    <circle cx="12" cy="0" r="2" fill="#4A5568">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+  </g>
 </svg> 
