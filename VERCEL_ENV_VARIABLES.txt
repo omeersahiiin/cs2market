@@ -1,0 +1,36 @@
+# Complete Vercel Environment Variables
+# Copy each line exactly as shown below
+
+DATABASE_URL=postgresql://postgres.ixqjqhqjqhqjqhqjqhqj:Omer123456789@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+
+NEXTAUTH_SECRET=cs2-derivatives-production-secret-key-2024-ultra-secure
+
+NEXTAUTH_URL=https://cs2market-prod-q3jivjspd-omeersahiiins-projects.vercel.app
+
+NEXT_PUBLIC_SUPABASE_URL=https://ixqjqhqjqhqjqhqjqhqj.supabase.co
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4cWpxaHFqcWhxanFocWpxaHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM5NTU5NzQsImV4cCI6MjA0OTUzMTk3NH0.example-key
+
+PRICEMPIRE_API_KEY=3d5a32f3-2a0c-414e-b98e-17160197f254
+
+PRICEMPIRE_RATE_LIMIT=100
+
+PRICEMPIRE_TIMEOUT=10000
+
+NODE_ENV=production
+
+DEBUG_PRICE_SERVICE=false
+
+ENABLE_REAL_TIME_UPDATES=true
+
+ENABLE_CONDITIONAL_ORDERS=true
+
+ENABLE_FLOAT_ANALYSIS=true
+
+ENABLE_ADVANCED_CHARTS=true
+
+MAX_POSITION_SIZE=1000
+
+MAX_LEVERAGE=10
+
+MARGIN_REQUIREMENT=0.1 
