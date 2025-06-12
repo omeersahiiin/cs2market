@@ -513,8 +513,28 @@ export function addMockTrade(skinId: string, price: number, quantity: number, si
 export function addMockOrder(order: any) {
   mockOrdersState.push(order);
   
-  // Update order book based on new order
-  updateMockOrderBook(order.skinId);
+  // Only add to order book if it's a limit order (not market order)
+  if (order.orderType === 'LIMIT' && order.status === 'OPEN') {
+    if (order.side === 'BUY') {
+      mockOrderBookState.bids.push({
+        price: order.price,
+        quantity: order.remainingQty || order.quantity,
+        total: order.price * (order.remainingQty || order.quantity),
+        orderId: order.id
+      });
+      // Sort bids by price (highest first)
+      mockOrderBookState.bids.sort((a, b) => b.price - a.price);
+    } else {
+      mockOrderBookState.asks.push({
+        price: order.price,
+        quantity: order.remainingQty || order.quantity,
+        total: order.price * (order.remainingQty || order.quantity),
+        orderId: order.id
+      });
+      // Sort asks by price (lowest first)
+      mockOrderBookState.asks.sort((a, b) => a.price - b.price);
+    }
+  }
   
   return order;
 }
@@ -624,4 +644,19 @@ export function getMockPositions(userId: string) {
   return mockPositionsState.filter(position => 
     position.userId === userId && !position.closedAt
   );
+}
+
+// Get user orders
+export function getMockOrders(userId: string, skinId?: string, status?: string[]) {
+  let orders = mockOrdersState.filter(order => order.userId === userId);
+  
+  if (skinId) {
+    orders = orders.filter(order => order.skinId === skinId);
+  }
+  
+  if (status && status.length > 0) {
+    orders = orders.filter(order => status.includes(order.status));
+  }
+  
+  return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 } 

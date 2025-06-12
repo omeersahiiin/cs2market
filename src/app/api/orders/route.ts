@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
-import { shouldUseMockData, MOCK_SKINS, addMockOrder, addMockTrade } from '@/lib/mock-data';
+import { shouldUseMockData, MOCK_SKINS, addMockOrder, addMockTrade, getMockOrders } from '@/lib/mock-data';
 
 // Conditional Prisma imports for when database is available
 let prisma: any = null;
@@ -40,16 +40,8 @@ export async function GET(request: NextRequest) {
       // Handle multiple status values separated by commas
       const statusFilter = status ? status.split(',').map((s: any) => s.trim()) : undefined;
       
-      // Filter mock orders
-      let filteredOrders = MOCK_ORDERS.filter(order => order.userId === session.user.id);
-      
-      if (skinId) {
-        filteredOrders = filteredOrders.filter(order => order.skinId === skinId);
-      }
-      
-      if (statusFilter) {
-        filteredOrders = filteredOrders.filter(order => statusFilter.includes(order.status));
-      }
+      // Get filtered orders using the new function
+      const filteredOrders = getMockOrders(session.user.id, skinId || undefined, statusFilter);
       
       return NextResponse.json({ orders: filteredOrders });
     }

@@ -163,11 +163,12 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
     if (!session?.user?.id) return;
     
     try {
-      const response = await fetch(`/api/orders?skinId=${params.id}&status=PENDING,PARTIAL`);
+      const response = await fetch(`/api/orders?skinId=${params.id}&status=OPEN,PENDING,PARTIAL`);
       if (!response.ok) {
         throw new Error('Failed to fetch orders');
       }
       const data = await response.json();
+      console.log('Fetched orders for skin:', params.id, data.orders);
       setUserOrders(data.orders || []);
     } catch (err) {
       console.error('Error fetching orders:', err);
