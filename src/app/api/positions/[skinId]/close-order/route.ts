@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PrismaClient, Prisma } from '@prisma/client';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
+import { shouldUseMockData, MOCK_ORDER_BOOK } from '@/lib/mock-data';
 
 const prisma = new PrismaClient();
 
@@ -34,7 +35,6 @@ async function executeMarketClose(engine: OrderMatchingEngine, userId: string, s
     const fillQty = Math.min(remainingQty, bookOrder.remainingQty);
     const fillPrice = bookOrder.price;
     
-    // Create fill record
     fills.push({
       buyOrderId: side === 'BUY' ? 'market-close' : bookOrder.id,
       sellOrderId: side === 'SELL' ? 'market-close' : bookOrder.id,
@@ -44,43 +44,17 @@ async function executeMarketClose(engine: OrderMatchingEngine, userId: string, s
       sellUserId: side === 'SELL' ? userId : bookOrder.userId
     });
     
-    // Update the book order
-    const newRemainingQty = bookOrder.remainingQty - fillQty;
+    remainingQty -= fillQty;
+    const newBookOrderRemainingQty = bookOrder.remainingQty - fillQty;
+    
     updatedOrders.push({
       orderId: bookOrder.id,
-      newRemainingQty: newRemainingQty,
-      status: newRemainingQty === 0 ? 'FILLED' : 'PARTIAL'
-    });
-    
-    remainingQty -= fillQty;
-  }
-  
-  // Execute the fills in the database
-  if (fills.length > 0) {
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Update the matched orders
-      for (const update of updatedOrders) {
-        await tx.order.update({
-          where: { id: update.orderId },
-          data: {
-            remainingQty: update.newRemainingQty,
-            filledQty: {
-              increment: fills
-                .filter(f => f.buyOrderId === update.orderId || f.sellOrderId === update.orderId)
-                .reduce((sum, f) => sum + f.quantity, 0)
-            },
-            status: update.status,
-            filledAt: update.status === 'FILLED' ? new Date() : undefined
-          }
-        });
-      }
+      newRemainingQty: newBookOrderRemainingQty,
+      status: newBookOrderRemainingQty === 0 ? 'FILLED' : 'PARTIAL'
     });
   }
   
-  return { 
-    orderId: 'market-close', 
-    matchResult: { fills, updatedOrders } 
-  };
+  return { orderId: 'market-close', matchResult: { fills, updatedOrders } };
 }
 
 // POST /api/positions/[skinId]/close-order - Close position via order book
@@ -92,6 +66,70 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if we should use mock data
+    if (shouldUseMockData()) {
+      console.log('Using mock data for position closing');
+      
+      const { skinId } = params;
+      const body = await request.json();
+      const { orderType = 'MARKET', price } = body;
+
+      // Find mock position
+      const mockPosition = {
+        id: 'pos-1',
+        userId: session.user.id,
+        skinId,
+        type: 'LONG',
+        entryPrice: MOCK_ORDER_BOOK.bids[0].price,
+        size: 2,
+        margin: 500,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        closedAt: null,
+        exitPrice: null
+      };
+
+      if (!mockPosition) {
+        return NextResponse.json({ error: 'No open position found for this skin' }, { status: 404 });
+      }
+
+      // For market orders, use current market price
+      const exitPrice = orderType === 'MARKET' 
+        ? (MOCK_ORDER_BOOK.asks[0].price + MOCK_ORDER_BOOK.bids[0].price) / 2
+        : price;
+
+      // Calculate PnL
+      const pnl = mockPosition.type === 'LONG'
+        ? (exitPrice - mockPosition.entryPrice) * mockPosition.size
+        : (mockPosition.entryPrice - exitPrice) * mockPosition.size;
+
+      // Return mock close result
+      return NextResponse.json({
+        success: true,
+        position: {
+          ...mockPosition,
+          closedAt: new Date(),
+          exitPrice,
+          pnl
+        },
+        order: {
+          id: `order-${Date.now()}`,
+          userId: session.user.id,
+          skinId,
+          side: mockPosition.type === 'LONG' ? 'SELL' : 'BUY',
+          orderType,
+          price: exitPrice,
+          quantity: mockPosition.size,
+          status: 'FILLED',
+          createdAt: new Date(),
+          fills: [{
+            price: exitPrice,
+            quantity: mockPosition.size,
+            timestamp: new Date()
+          }]
+        }
+      });
     }
 
     const user = await prisma.user.findUnique({
@@ -123,8 +161,6 @@ export async function POST(
     }
 
     // Determine the opposite side for closing
-    // If we have a LONG position, we need to SELL to close
-    // If we have a SHORT position, we need to BUY to close
     const closingSide = position.type === 'LONG' ? 'SELL' : 'BUY';
     const closingPositionType = position.type === 'LONG' ? 'SHORT' : 'LONG';
 
@@ -134,134 +170,58 @@ export async function POST(
     let result;
     
     if (orderType === 'MARKET') {
-      // For market orders, execute immediately against the order book
       result = await executeMarketClose(engine, user.id, closingSide, position.size);
       
       if (!result.matchResult.fills.length) {
         return NextResponse.json({ error: 'No liquidity available for market close' }, { status: 400 });
       }
     } else {
-      // For limit orders, place order in the book
       if (!price || price <= 0) {
         return NextResponse.json({ error: 'Invalid limit price' }, { status: 400 });
       }
       
       result = await engine.placeOrder({
         userId: user.id,
-        side: closingSide as 'BUY' | 'SELL',
+        side: closingSide,
         orderType: 'LIMIT',
-        positionType: (position.type === 'LONG' ? 'SHORT' : 'LONG') as 'LONG' | 'SHORT',
+        positionType: closingPositionType,
         price: price,
         quantity: position.size,
         timeInForce: 'GTC'
       });
     }
 
-    // If order was filled (fully or partially), close the position
-    if (result.matchResult.fills.length > 0) {
-      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        // Calculate filled quantity and average fill price
-        const userFills = result.matchResult.fills.filter(
-          fill => fill.buyUserId === user.id || fill.sellUserId === user.id
-        );
-        
-        const totalFilledQty = userFills.reduce((sum, fill) => sum + fill.quantity, 0);
-        const avgFillPrice = userFills.reduce((sum, fill) => sum + (fill.price * fill.quantity), 0) / totalFilledQty;
-        
-        if (totalFilledQty > 0) {
-          // Calculate P&L
-          const pnlPerUnit = position.type === 'LONG' 
-            ? avgFillPrice - position.entryPrice 
-            : position.entryPrice - avgFillPrice;
-          const totalPnL = pnlPerUnit * totalFilledQty;
-          
-          // Calculate commission on closing trade
-          const tradeValue = avgFillPrice * totalFilledQty;
-          const commission = tradeValue * 0.0002; // 0.02%
-          
-          // Net P&L after commission
-          const netPnL = totalPnL - commission;
-          
-          // Return margin and add/subtract P&L
-          const marginToReturn = position.margin * (totalFilledQty / position.size);
-          const balanceChange = marginToReturn + netPnL;
-          
-          // Update user balance
-          await tx.user.update({
-            where: { id: user.id },
-            data: {
-              balance: {
-                increment: balanceChange
-              }
-            }
-          });
+    // Calculate average fill price
+    const fills = result.matchResult.fills;
+    const totalFillQty = fills.reduce((sum, fill) => sum + fill.quantity, 0);
+    const avgFillPrice = fills.reduce((sum, fill) => sum + (fill.price * fill.quantity), 0) / totalFillQty;
 
-          // Transfer commission to market maker account
-          const marketMaker = await tx.user.findUnique({
-            where: { email: 'marketmaker@cs2derivatives.com' }
-          });
-          
-          if (marketMaker) {
-            await tx.user.update({
-              where: { id: marketMaker.id },
-              data: {
-                balance: {
-                  increment: commission
-                }
-              }
-            });
-          }
-          
-          if (totalFilledQty >= position.size) {
-            // Position fully closed
-            await tx.position.update({
-              where: { id: position.id },
-              data: {
-                exitPrice: avgFillPrice,
-                closedAt: new Date()
-              }
-            });
-          } else {
-            // Position partially closed - reduce size and margin
-            const remainingSize = position.size - totalFilledQty;
-            const remainingMargin = position.margin * (remainingSize / position.size);
-            
-            await tx.position.update({
-              where: { id: position.id },
-              data: {
-                size: remainingSize,
-                margin: remainingMargin
-              }
-            });
+    // Update position in database
+    const [updatedPosition] = await prisma.$transaction([
+      prisma.position.update({
+        where: { id: position.id },
+        data: {
+          closedAt: new Date(),
+          exitPrice: avgFillPrice
+        }
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          balance: {
+            increment: position.margin // Return the margin
           }
         }
-      });
-    }
-
-    // Get updated position
-    const updatedPosition = await prisma.position.findUnique({
-      where: { id: position.id },
-      include: {
-        skin: true
-      }
-    });
-
-    // Get the closing order details
-    const closingOrder = result.orderId ? await prisma.order.findUnique({
-      where: { id: result.orderId },
-      include: {
-        skin: true,
-        fills: true
-      }
-    }) : null;
+      })
+    ]);
 
     return NextResponse.json({
+      success: true,
       position: updatedPosition,
-      closingOrder: closingOrder,
-      matchResult: result.matchResult,
-      message: result.matchResult.fills.length > 0 
-        ? 'Position closed successfully through order book'
-        : 'Closing order placed in order book'
+      order: {
+        id: result.orderId,
+        fills: result.matchResult.fills
+      }
     });
 
   } catch (error) {
