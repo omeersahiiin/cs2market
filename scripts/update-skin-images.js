@@ -19,11 +19,22 @@ async function updateSkinImages() {
     for (const line of lines) {
       const [skinName, imageUrl] = line.split(':');
       if (skinName && imageUrl) {
-        skinImageMap[skinName.trim()] = imageUrl.trim();
+        const cleanName = skinName.trim();
+        skinImageMap[cleanName] = imageUrl.trim();
+        
+        // Also create variations with pipe separator
+        if (cleanName.includes(' ')) {
+          const parts = cleanName.split(' ');
+          if (parts.length >= 2) {
+            // Create version with pipe: "AWP Dragon Lore" -> "AWP | Dragon Lore"
+            const withPipe = parts[0] + ' | ' + parts.slice(1).join(' ');
+            skinImageMap[withPipe] = imageUrl.trim();
+          }
+        }
       }
     }
     
-    console.log(`📋 Found ${Object.keys(skinImageMap).length} skin image mappings`);
+    console.log(`📋 Found ${Object.keys(skinImageMap).length} skin image mappings (including variations)`);
     
     // Get all skins from database
     const skins = await prisma.skin.findMany();
@@ -31,10 +42,25 @@ async function updateSkinImages() {
     
     let updatedCount = 0;
     let notFoundCount = 0;
+    const updatedSkins = [];
+    const notFoundSkins = [];
     
     // Update each skin with its corresponding image
     for (const skin of skins) {
-      const imageUrl = skinImageMap[skin.name];
+      console.log(`🔍 Looking for: "${skin.name}"`);
+      
+      let imageUrl = skinImageMap[skin.name];
+      
+      // If not found, try alternative formats
+      if (!imageUrl) {
+        // Try without pipe: "AWP | Dragon Lore" -> "AWP Dragon Lore"
+        const withoutPipe = skin.name.replace(' | ', ' ');
+        imageUrl = skinImageMap[withoutPipe];
+        
+        if (imageUrl) {
+          console.log(`📝 Found match using format: "${withoutPipe}"`);
+        }
+      }
       
       if (imageUrl) {
         await prisma.skin.update({
@@ -43,24 +69,26 @@ async function updateSkinImages() {
         });
         console.log(`✅ Updated ${skin.name} with image URL`);
         updatedCount++;
+        updatedSkins.push(skin.name);
       } else {
         console.log(`❌ No image found for: ${skin.name}`);
         notFoundCount++;
+        notFoundSkins.push(skin.name);
       }
     }
     
     console.log('\n📊 Update Summary:');
     console.log(`✅ Successfully updated: ${updatedCount} skins`);
     console.log(`❌ No image found for: ${notFoundCount} skins`);
-    console.log(`📋 Total skin mappings available: ${Object.keys(skinImageMap).length}`);
     
-    // Show which mappings weren't used
-    const usedMappings = skins.filter(skin => skinImageMap[skin.name]).map(skin => skin.name);
-    const unusedMappings = Object.keys(skinImageMap).filter(name => !usedMappings.includes(name));
+    if (updatedSkins.length > 0) {
+      console.log('\n🎉 Updated skins:');
+      updatedSkins.forEach(name => console.log(`   ✅ ${name}`));
+    }
     
-    if (unusedMappings.length > 0) {
-      console.log('\n🔍 Unused image mappings (these skins might not exist in database):');
-      unusedMappings.forEach(name => console.log(`   - ${name}`));
+    if (notFoundSkins.length > 0) {
+      console.log('\n❌ Skins without images:');
+      notFoundSkins.forEach(name => console.log(`   ❌ ${name}`));
     }
     
     console.log('\n🎉 Skin image update process completed!');
