@@ -1,3 +1,8 @@
+// Prevent client-side import
+if (typeof window !== 'undefined') {
+  throw new Error('env.ts should not be imported on the client side');
+}
+
 // Environment configuration with fallbacks
 export const env = {
   // Database

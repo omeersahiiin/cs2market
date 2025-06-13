@@ -5,14 +5,18 @@ declare global {
 }
 
 // Create a singleton Prisma client with better connection handling
-export const prisma = globalThis.prisma || new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL + '?pgbouncer=true&connection_limit=1&prepared_statements=false'
-    }
-  },
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
-});
+const createPrismaClient = () => {
+  return new PrismaClient({
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL + '?pgbouncer=true&connection_limit=1&prepared_statements=false'
+      }
+    },
+    log: process.env.NODE_ENV === 'development' ? ['error'] : ['error']
+  });
+};
+
+export const prisma = globalThis.prisma || createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.prisma = prisma;
@@ -21,19 +25,10 @@ if (process.env.NODE_ENV !== 'production') {
 // Enhanced PrismaClientSingleton with better error handling and retry logic
 export class PrismaClientSingleton {
   private static instance: PrismaClient | null = null;
-  private static connectionAttempts = 0;
-  private static maxRetries = 3;
 
   static getInstance(): PrismaClient {
     if (!this.instance) {
-      this.instance = new PrismaClient({
-        datasources: {
-          db: {
-            url: process.env.DATABASE_URL + '?pgbouncer=true&connection_limit=1&prepared_statements=false'
-          }
-        },
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
-      });
+      this.instance = createPrismaClient();
     }
     return this.instance;
   }
@@ -59,7 +54,9 @@ export class PrismaClientSingleton {
           timeoutPromise
         ]);
         
-        console.log(`[PrismaClient] ${operationName} succeeded on attempt ${attempt}`);
+        if (attempt > 1) {
+          console.log(`[PrismaClient] ${operationName} succeeded on attempt ${attempt}`);
+        }
         return result;
         
       } catch (error: any) {
@@ -106,14 +103,7 @@ export class PrismaClientSingleton {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       console.log('[PrismaClient] Creating new connection...');
-      this.instance = new PrismaClient({
-        datasources: {
-          db: {
-            url: process.env.DATABASE_URL + '?pgbouncer=true&connection_limit=1&prepared_statements=false'
-          }
-        },
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
-      });
+      this.instance = createPrismaClient();
       
     } catch (error) {
       console.error('[PrismaClient] Error resetting connection:', error);
