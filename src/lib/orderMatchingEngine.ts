@@ -56,7 +56,7 @@ export class OrderMatchingEngine {
     const orders = await prisma.order.findMany({
       where: {
         skinId: this.skinId,
-        status: { in: ['PENDING', 'PARTIAL'] },
+        status: { in: ['OPEN', 'PARTIAL'] },
         remainingQty: { gt: 0 },
         ...(excludeOrderId && { id: { not: excludeOrderId } })
       },

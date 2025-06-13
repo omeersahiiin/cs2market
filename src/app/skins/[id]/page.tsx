@@ -287,10 +287,10 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
       // Show success message
       alert(`Order placed successfully! Order ID: ${result.order.id}`);
       
-      // Refresh data
+      // Refresh data without page reload
       await fetchPositions();
       await fetchUserOrders();
-      router.refresh();
+      await fetchSkinDetails();
       
     } catch (err) {
       console.error('Error placing order from skins page:', err);

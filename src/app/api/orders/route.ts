@@ -111,26 +111,30 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!skinId || !side || !orderType || !positionType || !quantity) {
+      console.error('[Orders API] Missing required fields:', { skinId, side, orderType, positionType, quantity });
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Validate order type and price
     if (orderType === 'LIMIT' && (!price || price <= 0)) {
+      console.error('[Orders API] Invalid limit order price:', price);
       return NextResponse.json({ error: 'Limit orders require a valid price' }, { status: 400 });
     }
 
     // Validate quantity
     if (quantity <= 0) {
+      console.error('[Orders API] Invalid quantity:', quantity);
       return NextResponse.json({ error: 'Quantity must be positive' }, { status: 400 });
     }
 
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('Creating mock order:', { skinId, side, orderType, positionType, price, quantity });
+      console.log('[Orders API] Creating mock order:', { skinId, side, orderType, positionType, price, quantity });
       
       // Find the skin
       const skin = MOCK_SKINS.find(s => s.id === skinId);
       if (!skin) {
+        console.error('[Orders API] Mock skin not found:', skinId);
         return NextResponse.json({ error: 'Skin not found' }, { status: 404 });
       }
 
@@ -193,10 +197,10 @@ export async function POST(request: NextRequest) {
         };
         
         addMockPosition(newPosition);
-        console.log('Created mock position:', newPosition.id);
+        console.log('[Orders API] Created mock position:', newPosition.id);
       }
 
-      console.log('Mock order created successfully:', newOrder.id);
+      console.log('[Orders API] Mock order created successfully:', newOrder.id);
 
       return NextResponse.json({
         order: newOrder,
@@ -208,6 +212,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Real database order placement
+    console.log('[Orders API] Processing real database order...');
+
     const user = await PrismaClientSingleton.executeWithRetry(
       async (prisma) => {
         return await prisma.user.findUnique({
@@ -218,12 +225,15 @@ export async function POST(request: NextRequest) {
     );
 
     if (!user) {
+      console.error('[Orders API] User not found:', session.user.email);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    console.log('[Orders API] User found:', { id: user.id, balance: user.balance });
+
     // Map mock skin ID to real database ID if needed
     const realSkinId = isMockId(skinId) ? mapMockIdToRealId(skinId) : skinId;
-    console.log(`Mapping skin ID: ${skinId} -> ${realSkinId}`);
+    console.log(`[Orders API] Mapping skin ID: ${skinId} -> ${realSkinId}`);
 
     // Check if skin exists
     const skin = await PrismaClientSingleton.executeWithRetry(
@@ -236,8 +246,8 @@ export async function POST(request: NextRequest) {
     );
 
     if (!skin) {
-      console.error(`Skin not found with ID: ${skinId} (mapped to: ${realSkinId})`);
-      console.log('Available skin IDs in database:');
+      console.error(`[Orders API] Skin not found with ID: ${skinId} (mapped to: ${realSkinId})`);
+      console.log('[Orders API] Available skin IDs in database:');
       const allSkins = await PrismaClientSingleton.executeWithRetry(
         async (prisma) => {
           return await prisma.skin.findMany({ select: { id: true, name: true } });
@@ -252,19 +262,35 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    console.log('[Orders API] Skin found:', { id: skin.id, name: skin.name, price: skin.price });
+
     // Calculate required margin (20% of position value)
     const estimatedPrice = price || skin.price;
     const positionValue = estimatedPrice * quantity;
     const requiredMargin = positionValue * 0.2; // 20% margin requirement
 
+    console.log('[Orders API] Margin calculation:', {
+      estimatedPrice,
+      positionValue,
+      requiredMargin,
+      userBalance: user.balance
+    });
+
     // Check if user has sufficient balance
     if (user.balance < requiredMargin) {
+      console.error('[Orders API] Insufficient balance:', {
+        required: requiredMargin,
+        available: user.balance,
+        shortfall: requiredMargin - user.balance
+      });
       return NextResponse.json({ 
         error: 'Insufficient balance for margin requirement',
         required: requiredMargin,
         available: user.balance
       }, { status: 400 });
     }
+
+    console.log('[Orders API] Balance check passed, placing order...');
 
     // Initialize order matching engine with real skin ID
     const engine = new OrderMatchingEngine(realSkinId);
@@ -280,8 +306,15 @@ export async function POST(request: NextRequest) {
       timeInForce
     });
 
+    console.log('[Orders API] Order placed in engine:', {
+      orderId: result.orderId,
+      fillsCount: result.matchResult.fills.length
+    });
+
     // If order was filled (fully or partially), create positions and update balance
     if (result.matchResult.fills.length > 0) {
+      console.log('[Orders API] Order has fills, creating position and updating balance...');
+      
       await PrismaClientSingleton.executeWithRetry(
         async (prisma) => {
           return await prisma.$transaction(async (tx: any) => {
@@ -293,10 +326,25 @@ export async function POST(request: NextRequest) {
             const totalFilledQty = userFills.reduce((sum, fill) => sum + fill.quantity, 0);
             const avgFillPrice = userFills.reduce((sum, fill) => sum + (fill.price * fill.quantity), 0) / totalFilledQty;
             
+            console.log('[Orders API] Fill details:', {
+              userFillsCount: userFills.length,
+              totalFilledQty,
+              avgFillPrice
+            });
+            
             if (totalFilledQty > 0) {
               // Calculate commission (0.02% of trade value)
               const tradeValue = avgFillPrice * totalFilledQty;
               const commission = tradeValue * 0.0002; // 0.02%
+              
+              console.log('[Orders API] Creating position:', {
+                userId: user.id,
+                skinId: realSkinId,
+                type: positionType,
+                entryPrice: avgFillPrice,
+                size: totalFilledQty,
+                margin: avgFillPrice * totalFilledQty * 0.2
+              });
               
               // Create position for filled quantity
               await tx.position.create({
@@ -313,6 +361,13 @@ export async function POST(request: NextRequest) {
               // Deduct margin + commission from user balance
               const marginUsed = avgFillPrice * totalFilledQty * 0.2;
               const totalDeduction = marginUsed + commission;
+              
+              console.log('[Orders API] Updating user balance:', {
+                marginUsed,
+                commission,
+                totalDeduction,
+                newBalance: user.balance - totalDeduction
+              });
               
               await tx.user.update({
                 where: { id: user.id },
@@ -337,12 +392,15 @@ export async function POST(request: NextRequest) {
                     }
                   }
                 });
+                console.log('[Orders API] Commission transferred to market maker:', commission);
               }
             }
           });
         },
         'create position and update balance'
       );
+    } else {
+      console.log('[Orders API] Order placed but no fills (limit order in order book)');
     }
 
     // Get updated order details
@@ -359,9 +417,16 @@ export async function POST(request: NextRequest) {
       'fetch updated order details'
     );
 
+    if (!updatedOrder) {
+      console.error('[Orders API] Failed to fetch updated order details');
+      throw new Error('Failed to fetch updated order details');
+    }
+
     console.log(`[Orders API] Order placed successfully: ${result.orderId}`);
+    console.log(`[Orders API] Final order status: ${updatedOrder.status}`);
     console.log(`[Orders API] Match result:`, { 
-      fills: result.matchResult.fills.length
+      fills: result.matchResult.fills.length,
+      remainingQty: updatedOrder.remainingQty
     });
 
     return NextResponse.json({
@@ -371,6 +436,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[Orders API] Error placing order:', error);
+    console.error('[Orders API] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     // Return more specific error information
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
