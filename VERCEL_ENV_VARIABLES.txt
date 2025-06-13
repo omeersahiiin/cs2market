@@ -1,15 +1,17 @@
 # Complete Vercel Environment Variables
 # Copy each line exactly as shown below
 
-DATABASE_URL=postgresql://postgres.ixqjqhqjqhqjqhqjqhqj:Omer123456789@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+DATABASE_URL=postgresql://postgres.oaobkrhfctwjoyibctun:b60ctvoybj.@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+
+DIRECT_URL=postgresql://postgres:b60ctvoybj.@db.oaobkrhfctwjoyibctun.supabase.co:5432/postgres
 
 NEXTAUTH_SECRET=cs2-derivatives-production-secret-key-2024-ultra-secure
 
-NEXTAUTH_URL=https://cs2market-prod-q3jivjspd-omeersahiiins-projects.vercel.app
+NEXTAUTH_URL=https://cs2market-prod.vercel.app
 
-NEXT_PUBLIC_SUPABASE_URL=https://ixqjqhqjqhqjqhqjqhqj.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://oaobkrhfctwjoyibctun.supabase.co
 
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4cWpxaHFqcWhxanFocWpxaHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM5NTU5NzQsImV4cCI6MjA0OTUzMTk3NH0.example-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hb2JrcmhmY3R3am95aWJjdHVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk2NDIxODEsImV4cCI6MjA2NTIxODE4MX0.X1l5FAhHKtJVyXi5B57p6bpTtDN1Vanc9anlRbq6eec
 
 PRICEMPIRE_API_KEY=3d5a32f3-2a0c-414e-b98e-17160197f254
 

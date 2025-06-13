@@ -1,4 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
+const path = require('path');
 
 const prisma = new PrismaClient();
 
@@ -25,103 +27,209 @@ const CORRECT_IMAGE_IDS = {
   'AWP | Lightning Strike': '-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17PLfYQJD_9W7m5a0mvLwOq7c2GlUucFwjruR9t7231DmrRc_NW7yItCRcVNoYVHS-APrwbzu0JK-78nXiSw0EnwDRM0' // PLACEHOLDER - needs real ID
 };
 
-async function fixSkinImages() {
-  console.log('🔧 Fixing skin image URLs...\n');
-
-  let fixedCount = 0;
-  let skippedCount = 0;
-
-  for (const [skinName, correctImageId] of Object.entries(CORRECT_IMAGE_IDS)) {
-    try {
-      const skin = await prisma.skin.findFirst({
-        where: { name: skinName }
-      });
-
-      if (!skin) {
-        console.log(`⚠️  Skin "${skinName}" not found in database`);
-        skippedCount++;
-        continue;
-      }
-
-      if (skin.iconPath === correctImageId) {
-        console.log(`✅ ${skinName} - Image already correct`);
-        skippedCount++;
-        continue;
-      }
-
-      await prisma.skin.update({
-        where: { id: skin.id },
-        data: { iconPath: correctImageId }
-      });
-
-      console.log(`🔧 Fixed: ${skinName}`);
-      console.log(`   Old: ${skin.iconPath.substring(0, 30)}...`);
-      console.log(`   New: ${correctImageId.substring(0, 30)}...`);
-      console.log(`   URL: https://community.cloudflare.steamstatic.com/economy/image/${correctImageId}`);
-      console.log('');
-
-      fixedCount++;
-
-    } catch (error) {
-      console.error(`❌ Error fixing "${skinName}":`, error.message);
-      skippedCount++;
-    }
-  }
-
-  console.log('📊 Summary:');
-  console.log(`   🔧 Fixed: ${fixedCount} skins`);
-  console.log(`   ⏭️  Skipped: ${skippedCount} skins`);
-  console.log(`   📈 Total processed: ${Object.keys(CORRECT_IMAGE_IDS).length} skins\n`);
-
-  console.log('💡 Next steps:');
-  console.log('1. Go to https://wiki.cs.money');
-  console.log('2. Search for skins that still show broken images');
-  console.log('3. Right-click on the skin image and copy image URL');
-  console.log('4. Extract the part after "/economy/image/"');
-  console.log('5. Update this script with the correct image IDs');
-  console.log('6. Run this script again');
-}
-
-// Function to update a single skin image
-async function updateSkinImage(skinName, newImageId) {
+async function loadSkinImageMappings() {
+  console.log('📖 Loading skin image mappings from skin-images.txt...');
+  
   try {
-    const skin = await prisma.skin.findFirst({
-      where: { name: skinName }
-    });
-
-    if (!skin) {
-      console.log(`❌ Skin "${skinName}" not found`);
-      return;
+    const filePath = path.join(__dirname, '..', 'skin-images.txt');
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    
+    // Split by lines and filter out empty lines
+    const lines = fileContent.split('\n').filter(line => line.trim());
+    
+    const mappings = new Map();
+    
+    for (const line of lines) {
+      // Find the first colon to split skin name and URL
+      const colonIndex = line.indexOf(':');
+      if (colonIndex === -1) continue;
+      
+      const skinName = line.substring(0, colonIndex).trim();
+      const imageUrl = line.substring(colonIndex + 1).trim();
+      
+      if (skinName && imageUrl && imageUrl.startsWith('https://')) {
+        // Store both with and without pipe format
+        mappings.set(skinName, imageUrl);
+        
+        // If name doesn't have pipe, also store with pipe format
+        if (!skinName.includes(' | ') && skinName.includes(' ')) {
+          const parts = skinName.split(' ');
+          if (parts.length >= 2) {
+            const weapon = parts[0] + (parts[1] && parts[1].startsWith('-') ? parts[1] : '');
+            const skinNamePart = parts.slice(weapon.includes('-') ? 2 : 1).join(' ');
+            const pipeFormat = `${weapon} | ${skinNamePart}`;
+            mappings.set(pipeFormat, imageUrl);
+          }
+        }
+        
+        // If name has pipe, also store without pipe format
+        if (skinName.includes(' | ')) {
+          const withoutPipe = skinName.replace(' | ', ' ');
+          mappings.set(withoutPipe, imageUrl);
+        }
+        
+        console.log(`✅ Mapped: ${skinName} -> ${imageUrl.substring(0, 80)}...`);
+      }
     }
-
-    await prisma.skin.update({
-      where: { id: skin.id },
-      data: { iconPath: newImageId }
-    });
-
-    console.log(`✅ Updated ${skinName} image`);
-    console.log(`   New URL: https://community.cloudflare.steamstatic.com/economy/image/${newImageId}`);
-
+    
+    console.log(`🎯 Loaded ${mappings.size} skin image mappings`);
+    return mappings;
   } catch (error) {
-    console.error(`❌ Error updating "${skinName}":`, error.message);
+    console.error('❌ Error loading skin image mappings:', error.message);
+    return new Map();
   }
 }
 
-// Check if script is called with arguments to update a single skin
-const args = process.argv.slice(2);
-if (args.length === 2) {
-  const [skinName, imageId] = args;
-  console.log(`🔧 Updating single skin: ${skinName}`);
-  updateSkinImage(skinName, imageId)
-    .finally(() => prisma.$disconnect());
-} else {
-  // Run the full fix
-  fixSkinImages()
-    .catch((e) => {
-      console.error('❌ Error:', e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
+function getImageUrlForSkin(skinName, imageMappings) {
+  // Try exact match first
+  if (imageMappings.has(skinName)) {
+    return imageMappings.get(skinName);
+  }
+  
+  // Try case-insensitive match
+  for (const [mappedName, url] of imageMappings.entries()) {
+    if (mappedName.toLowerCase() === skinName.toLowerCase()) {
+      return url;
+    }
+  }
+  
+  // Try partial match (weapon name + skin name)
+  const skinLower = skinName.toLowerCase();
+  for (const [mappedName, url] of imageMappings.entries()) {
+    const mappedLower = mappedName.toLowerCase();
+    if (mappedLower.includes(skinLower) || skinLower.includes(mappedLower)) {
+      return url;
+    }
+  }
+  
+  return null;
+}
+
+async function updateAllSkinsWithImages() {
+  console.log('\n🖼️  Updating all skins with proper images...');
+  
+  try {
+    // Load image mappings
+    const imageMappings = await loadSkinImageMappings();
+    
+    if (imageMappings.size === 0) {
+      console.log('❌ No image mappings loaded, aborting...');
+      return 0;
+    }
+    
+    // Get all skins from database
+    const allSkins = await prisma.skin.findMany();
+    console.log(`\n📊 Found ${allSkins.length} skins in database`);
+    
+    let updatedCount = 0;
+    let foundCount = 0;
+    let notFoundCount = 0;
+    
+    for (const skin of allSkins) {
+      const imageUrl = getImageUrlForSkin(skin.name, imageMappings);
+      
+      if (imageUrl) {
+        // Update the skin with the correct image URL
+        await prisma.skin.update({
+          where: { id: skin.id },
+          data: { iconPath: imageUrl }
+        });
+        
+        console.log(`✅ Updated: ${skin.name}`);
+        console.log(`   🖼️  URL: ${imageUrl.substring(0, 80)}...`);
+        updatedCount++;
+        foundCount++;
+      } else {
+        console.log(`❌ No image found for: ${skin.name}`);
+        notFoundCount++;
+      }
+    }
+    
+    console.log(`\n📊 Update Summary:`);
+    console.log(`   ✅ Updated: ${updatedCount} skins`);
+    console.log(`   🎯 Found images: ${foundCount} skins`);
+    console.log(`   ❌ No images: ${notFoundCount} skins`);
+    
+    return updatedCount;
+  } catch (error) {
+    console.error('❌ Error updating skins:', error.message);
+    return 0;
+  }
+}
+
+async function verifyImageUrls() {
+  console.log('\n🔍 Verifying image URLs in database...');
+  
+  try {
+    const skins = await prisma.skin.findMany({
+      select: { name: true, iconPath: true }
     });
-} 
+    
+    let validUrls = 0;
+    let invalidUrls = 0;
+    
+    for (const skin of skins) {
+      if (skin.iconPath && skin.iconPath.startsWith('https://community.cloudflare.steamstatic.com/')) {
+        validUrls++;
+        console.log(`✅ ${skin.name}: Valid Steam URL`);
+      } else {
+        invalidUrls++;
+        console.log(`❌ ${skin.name}: Invalid URL - ${skin.iconPath || 'NULL'}`);
+      }
+    }
+    
+    console.log(`\n📊 URL Verification:`);
+    console.log(`   ✅ Valid Steam URLs: ${validUrls}`);
+    console.log(`   ❌ Invalid URLs: ${invalidUrls}`);
+    
+  } catch (error) {
+    console.error('❌ Error verifying URLs:', error.message);
+  }
+}
+
+async function main() {
+  console.log('🔧 CS2 Derivatives - Fix Skin Images\n');
+  
+  try {
+    // Test database connection
+    await prisma.$connect();
+    console.log('✅ Connected to Supabase database\n');
+    
+    // Update all skins with proper images
+    const updatedCount = await updateAllSkinsWithImages();
+    
+    // Verify the results
+    await verifyImageUrls();
+    
+    console.log('\n🎉 Image Fix Complete!');
+    console.log(`📊 Updated ${updatedCount} skins with proper Steam images`);
+    console.log('\n🌐 Next Steps:');
+    console.log('   1. Refresh your website to see the updated images');
+    console.log('   2. All skins should now display proper Steam Community images');
+    
+  } catch (error) {
+    console.error('❌ Fix failed:', error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// Handle script termination
+process.on('SIGINT', async () => {
+  console.log('\n⏹️  Script interrupted');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('\n⏹️  Script terminated');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+if (require.main === module) {
+  main().catch(console.error);
+}
+
+module.exports = { main }; 
