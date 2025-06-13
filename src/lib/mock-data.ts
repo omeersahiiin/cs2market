@@ -619,8 +619,8 @@ export const MOCK_WEAR_ANALYSIS = {
 
 // Function to determine if we should use mock data
 export function shouldUseMockData(): boolean {
-  // Try to use real database with new Supabase setup
-  return false;
+  // Use mock data in development, real database in production
+  return process.env.NODE_ENV !== 'production';
 }
 
 // Mock authentication
