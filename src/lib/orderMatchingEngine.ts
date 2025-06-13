@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClientSingleton } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
+const prisma = PrismaClientSingleton.getInstance();
 
 /**
  * Round price to 2 decimal places to avoid floating-point precision issues
