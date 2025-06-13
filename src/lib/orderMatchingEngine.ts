@@ -37,7 +37,7 @@ export interface MatchResult {
   updatedOrders: Array<{
     orderId: string;
     newRemainingQty: number;
-    status: 'PARTIAL' | 'FILLED';
+    status: 'PARTIAL' | 'FILLED' | 'OPEN';
   }>;
   marketPrice?: number;
 }
@@ -290,12 +290,12 @@ export class OrderMatchingEngine {
 
     // Update the incoming order
     const newOrderStatus = remainingQty === 0 ? 'FILLED' : 
-                          remainingQty < order.quantity ? 'PARTIAL' : 'PENDING';
+                          remainingQty < order.quantity ? 'PARTIAL' : 'OPEN';
     
     updatedOrders.push({
       orderId: order.id,
       newRemainingQty: remainingQty,
-      status: newOrderStatus as 'PARTIAL' | 'FILLED'
+      status: newOrderStatus as 'PARTIAL' | 'FILLED' | 'OPEN'
     });
 
     // Execute all updates in a transaction
@@ -368,7 +368,7 @@ export class OrderMatchingEngine {
         where: {
           id: orderId,
           userId: userId,
-          status: { in: ['PENDING', 'PARTIAL'] }
+          status: { in: ['PENDING', 'PARTIAL', 'OPEN'] }
         }
       });
 
