@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
 import { shouldUseMockData, MOCK_SKINS, addMockOrder, addMockTrade, getMockOrders } from '@/lib/mock-data';
+import { mapMockIdToRealId, isMockId } from '@/lib/skin-id-mapping';
 
 // Conditional Prisma imports for when database is available
 let prisma: any = null;
@@ -61,10 +62,13 @@ export async function GET(request: NextRequest) {
     // Handle multiple status values separated by commas
     const statusFilter = status ? status.split(',').map((s: any) => s.trim()) : undefined;
 
+    // Map mock skin ID to real database ID if needed
+    const realSkinId = skinId && isMockId(skinId) ? mapMockIdToRealId(skinId) : skinId;
+
     const orders = await prisma.order.findMany({
       where: {
         userId: user.id,
-        ...(skinId && { skinId }),
+        ...(realSkinId && { skinId: realSkinId }),
         ...(statusFilter && { status: { in: statusFilter } })
       },
       include: {
@@ -199,13 +203,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Map mock skin ID to real database ID if needed
+    const realSkinId = isMockId(skinId) ? mapMockIdToRealId(skinId) : skinId;
+    console.log(`Mapping skin ID: ${skinId} -> ${realSkinId}`);
+
     // Check if skin exists
     const skin = await prisma.skin.findUnique({
-      where: { id: skinId }
+      where: { id: realSkinId }
     });
 
     if (!skin) {
-      return NextResponse.json({ error: 'Skin not found' }, { status: 404 });
+      console.error(`Skin not found with ID: ${skinId} (mapped to: ${realSkinId})`);
+      console.log('Available skin IDs in database:');
+      const allSkins = await prisma.skin.findMany({ select: { id: true, name: true } });
+      allSkins.forEach((s: any) => console.log(`- ${s.id}: ${s.name}`));
+      return NextResponse.json({ 
+        error: 'Skin not found',
+        details: `Skin ID "${skinId}" (mapped to "${realSkinId}") does not exist in database`,
+        availableSkins: allSkins.map((s: any) => ({ id: s.id, name: s.name }))
+      }, { status: 404 });
     }
 
     // Calculate required margin (20% of position value)
@@ -222,8 +238,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Initialize order matching engine
-    const engine = new OrderMatchingEngine(skinId);
+    // Initialize order matching engine with real skin ID
+    const engine = new OrderMatchingEngine(realSkinId);
 
     // Place the order
     const result = await engine.placeOrder({
@@ -256,7 +272,7 @@ export async function POST(request: NextRequest) {
           await tx.position.create({
             data: {
               userId: user.id,
-              skinId,
+              skinId: realSkinId,
               type: positionType,
               entryPrice: avgFillPrice,
               size: totalFilledQty,
