@@ -5,17 +5,26 @@ import { PrismaClientSingleton } from '@/lib/prisma';
 import { MOCK_SKINS, shouldUseMockData } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // GET /api/skins - Get all skins with optional query parameters
 export async function GET(request: Request) {
   try {
+    console.log(`[Skins API] Starting request - Should use mock: ${shouldUseMockData()}`);
+    console.log(`[Skins API] Environment: NODE_ENV=${process.env.NODE_ENV}, VERCEL=${process.env.VERCEL}`);
+    
     // Check if we should use mock data first
     if (shouldUseMockData()) {
-      console.log('🎭 Using mock data for skins API');
-      return NextResponse.json(MOCK_SKINS);
+      console.log('[Skins API] Using mock data for skins API');
+      return NextResponse.json({
+        skins: MOCK_SKINS,
+        total: MOCK_SKINS.length,
+        mock: true,
+        message: 'Using mock data'
+      });
     }
 
-    console.log('🔍 Attempting to fetch skins...');
+    console.log('[Skins API] Attempting to fetch skins from database...');
     
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -39,16 +48,16 @@ export async function GET(request: Request) {
         'fetch skins'
       );
       
-      console.log(`✅ Successfully fetched ${skins.length} skins from database`);
+      console.log(`[Skins API] Successfully fetched ${skins.length} skins from database`);
     } catch (dbError) {
-      console.log('⚠️ Database unavailable, using mock data...', dbError instanceof Error ? dbError.message : 'Unknown error');
+      console.error('[Skins API] Database error:', dbError instanceof Error ? dbError.message : 'Unknown error');
       skins = generateMockSkins(limit);
       isUsingMockData = true;
     }
     
     // If we got no skins from database, use mock data as fallback
     if (!skins || skins.length === 0) {
-      console.log('📦 No skins found in database, using mock data...');
+      console.log('[Skins API] No skins found in database, using mock data...');
       skins = generateMockSkins(limit);
       isUsingMockData = true;
     }
@@ -119,66 +128,11 @@ export async function GET(request: Request) {
 
 // Generate mock skins data when database is unavailable
 function generateMockSkins(limit: number) {
-  const mockSkins = [
-    {
-      id: '1',
-      name: 'AK-47 | Redline',
-      type: 'Rifle',
-      rarity: 'Classified',
-      iconPath: '/icons/ak47-redline.png',
-      price: 85.50,
-      wear: 'Field-Tested',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '2', 
-      name: 'AWP | Dragon Lore',
-      type: 'Sniper Rifle',
-      rarity: 'Contraband',
-      iconPath: '/icons/awp-dragonlore.png',
-      price: 7500.00,
-      wear: 'Field-Tested',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '3',
-      name: 'M4A4 | Asiimov',
-      type: 'Rifle',
-      rarity: 'Covert',
-      iconPath: '/icons/m4a4-asiimov.png',
-      price: 109.99,
-      wear: 'Field-Tested',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '4',
-      name: 'AK-47 | Vulcan',
-      type: 'Rifle',
-      rarity: 'Classified',
-      iconPath: '/icons/ak47-vulcan.png',
-      price: 185.75,
-      wear: 'Minimal Wear',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '5',
-      name: 'AWP | Asiimov',
-      type: 'Sniper Rifle',
-      rarity: 'Covert',
-      iconPath: '/icons/awp-asiimov.png',
-      price: 151.25,
-      wear: 'Field-Tested',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ];
+  // Use the full MOCK_SKINS array from mock-data.ts instead of limited local array
+  const mockSkins = MOCK_SKINS.slice(0, Math.min(limit, MOCK_SKINS.length));
 
   // Enhance mock skins with market data
-  return mockSkins.slice(0, limit).map((skin: any) => {
+  return mockSkins.map((skin: any) => {
     const baseVolume = getBaseVolumeForSkin(skin.name, skin.rarity);
     const priceChange24h = calculatePriceChange(parseFloat(skin.price.toString()), skin.rarity);
     const priceChangePercent = (priceChange24h / parseFloat(skin.price.toString())) * 100;

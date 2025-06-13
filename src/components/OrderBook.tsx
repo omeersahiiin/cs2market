@@ -46,13 +46,31 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
   useEffect(() => {
     const fetchOrderBook = async () => {
       try {
+        console.log(`[OrderBook] Fetching order book for skin: ${skinId}`);
         const response = await fetch(`/api/orderbook/${skinId}`);
-        if (!response.ok) throw new Error('Failed to fetch order book');
+        
+        if (!response.ok) {
+          console.error(`[OrderBook] API response not ok: ${response.status}`);
+          throw new Error(`Failed to fetch order book: ${response.status}`);
+        }
         
         const data = await response.json();
+        console.log(`[OrderBook] Received data:`, data);
         
-        setBids(data.orderBook.bids || []);
-        setAsks(data.orderBook.asks || []);
+        // Handle both successful and error responses
+        if (data.error) {
+          console.warn(`[OrderBook] API returned error: ${data.error}`);
+          setBids([]);
+          setAsks([]);
+          return;
+        }
+        
+        const bidsData = data.orderBook?.bids || [];
+        const asksData = data.orderBook?.asks || [];
+        
+        console.log(`[OrderBook] Setting bids: ${bidsData.length}, asks: ${asksData.length}`);
+        setBids(bidsData);
+        setAsks(asksData);
         
         // Calculate spread
         const bestBid = data.bestPrices?.bestBid || 0;
@@ -69,7 +87,10 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
           onMarketPriceUpdate(marketPrice);
         }
       } catch (error) {
-        console.error('Error fetching order book:', error);
+        console.error('[OrderBook] Error fetching order book:', error);
+        // Set empty arrays on error to prevent UI issues
+        setBids([]);
+        setAsks([]);
       }
     };
 
@@ -86,10 +107,25 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
   useEffect(() => {
     const fetchTrades = async () => {
       try {
+        console.log(`[OrderBook] Fetching trades for skin: ${skinId}`);
         const response = await fetch(`/api/trades/${skinId}?limit=20`);
-        if (!response.ok) throw new Error('Failed to fetch trades');
+        
+        if (!response.ok) {
+          console.error(`[OrderBook] Trades API response not ok: ${response.status}`);
+          // Don't throw error, just set empty trades
+          setTrades([]);
+          return;
+        }
         
         const data = await response.json();
+        console.log(`[OrderBook] Received trades data:`, data);
+        
+        // Handle both successful and error responses
+        if (data.error || !data.trades) {
+          console.warn(`[OrderBook] Trades API returned error or no trades: ${data.error || 'No trades'}`);
+          setTrades([]);
+          return;
+        }
         
         // Transform API data to match component interface
         const formattedTrades = data.trades.map((trade: any) => ({
@@ -101,9 +137,12 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
           total: trade.price * trade.quantity
         }));
         
+        console.log(`[OrderBook] Setting ${formattedTrades.length} trades`);
         setTrades(formattedTrades);
       } catch (error) {
-        console.error('Error fetching trades:', error);
+        console.error('[OrderBook] Error fetching trades:', error);
+        // Set empty array on error to prevent UI issues
+        setTrades([]);
       }
     };
 
