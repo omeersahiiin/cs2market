@@ -109,15 +109,15 @@ export const authOptions: NextAuthOptions = {
             if (shouldUseMockData()) {
               balance = 10000; // Default mock balance
             } else {
-              const dbUser = await PrismaClientSingleton.executeWithRetry(
-                async (prisma) => {
-                  return await prisma.user.findUnique({ 
-                    where: { id: user.id } 
-                  });
-                },
-                'fetch user balance'
-              );
-              balance = dbUser?.balance ?? 0;
+            const dbUser = await PrismaClientSingleton.executeWithRetry(
+              async (prisma) => {
+                return await prisma.user.findUnique({ 
+                  where: { id: user.id } 
+                });
+              },
+              'fetch user balance'
+            );
+            balance = dbUser?.balance ?? 0;
             }
           } catch (error) {
             console.error('Error fetching user balance:', error);

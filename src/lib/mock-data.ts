@@ -619,7 +619,7 @@ export const MOCK_WEAR_ANALYSIS = {
 
 // Function to determine if we should use mock data
 export function shouldUseMockData(): boolean {
-  // Switch to real database - no more mock data
+  // Try to use real database with new Supabase setup
   return false;
 }
 
