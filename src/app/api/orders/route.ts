@@ -96,6 +96,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/orders - Place a new order
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -113,9 +115,15 @@ export async function POST(request: NextRequest) {
 
     const { skinId, side, orderType, positionType, price, quantity, timeInForce } = body;
 
-    console.log(`[Orders API] Placing order for user: ${session.user.email}`);
+    console.log(`[Orders API] === ORDER PLACEMENT START ===`);
+    console.log(`[Orders API] Timestamp: ${new Date().toISOString()}`);
+    console.log(`[Orders API] User: ${session.user.email}`);
     console.log(`[Orders API] Order details:`, { skinId, side, orderType, positionType, price, quantity });
-    console.log(`[Orders API] Should use mock data: ${shouldUseMockData()}`);
+    console.log(`[Orders API] Environment check:`);
+    console.log(`[Orders API] - NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`[Orders API] - VERCEL: ${process.env.VERCEL}`);
+    console.log(`[Orders API] - DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
+    console.log(`[Orders API] - Should use mock data: ${shouldUseMockData()}`);
 
     // Validate required fields
     if (!skinId || !side || !orderType || !positionType || !quantity) {
@@ -163,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('[Orders API] Creating mock order:', { skinId, side, orderType, positionType, price, quantity });
+      console.log('[Orders API] Using mock data path');
       
       // Find the skin
       const skin = MOCK_SKINS.find(s => s.id === skinId);
@@ -247,17 +255,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Real database order placement
-    console.log('[Orders API] Processing real database order...');
+    console.log('[Orders API] === REAL DATABASE PATH ===');
 
-    // Add timeout wrapper for database operations
-    const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+    // Add timeout wrapper for database operations with enhanced error handling
+    const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> => {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+        setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs);
       });
       
-      return Promise.race([promise, timeoutPromise]);
+      try {
+        const result = await Promise.race([promise, timeoutPromise]);
+        console.log(`[Orders API] ${operation} completed successfully`);
+        return result;
+      } catch (error) {
+        console.error(`[Orders API] ${operation} failed:`, error);
+        throw error;
+      }
     };
 
+    console.log('[Orders API] Step 1: Fetching user...');
     const user = await withTimeout(
       PrismaClientSingleton.executeWithRetry(
         async (prisma) => {
@@ -267,7 +283,8 @@ export async function POST(request: NextRequest) {
         },
         'fetch user for order placement'
       ),
-      10000 // 10 second timeout
+      10000, // 10 second timeout
+      'User fetch'
     );
 
     if (!user) {
@@ -282,9 +299,10 @@ export async function POST(request: NextRequest) {
 
     // Map mock skin ID to real database ID if needed
     const realSkinId = isMockId(skinId) ? mapMockIdToRealId(skinId) : skinId;
-    console.log(`[Orders API] Mapping skin ID: ${skinId} -> ${realSkinId}`);
+    console.log(`[Orders API] Step 2: Skin ID mapping: ${skinId} -> ${realSkinId}`);
 
     // Check if skin exists
+    console.log('[Orders API] Step 3: Fetching skin...');
     const skin = await withTimeout(
       PrismaClientSingleton.executeWithRetry(
         async (prisma) => {
@@ -294,35 +312,16 @@ export async function POST(request: NextRequest) {
         },
         'fetch skin for order placement'
       ),
-      10000 // 10 second timeout
+      10000, // 10 second timeout
+      'Skin fetch'
     );
 
     if (!skin) {
       console.error(`[Orders API] Skin not found with ID: ${skinId} (mapped to: ${realSkinId})`);
-      console.log('[Orders API] Available skin IDs in database:');
-      try {
-        const allSkins = await withTimeout(
-          PrismaClientSingleton.executeWithRetry(
-            async (prisma) => {
-              return await prisma.skin.findMany({ select: { id: true, name: true } });
-            },
-            'fetch all skins for error logging'
-          ),
-          5000 // 5 second timeout for error logging
-        );
-        allSkins.forEach((s: any) => console.log(`- ${s.id}: ${s.name}`));
-        return NextResponse.json({ 
-          error: 'Skin not found',
-          details: `Skin ID "${skinId}" (mapped to "${realSkinId}") does not exist in database`,
-          availableSkins: allSkins.map((s: any) => ({ id: s.id, name: s.name }))
-        }, { status: 404 });
-      } catch (skinListError) {
-        console.error('[Orders API] Failed to fetch skin list for error response:', skinListError);
-        return NextResponse.json({ 
-          error: 'Skin not found',
-          details: `Skin ID "${skinId}" (mapped to "${realSkinId}") does not exist in database`
-        }, { status: 404 });
-      }
+      return NextResponse.json({ 
+        error: 'Skin not found',
+        details: `Skin ID "${skinId}" (mapped to "${realSkinId}") does not exist in database`
+      }, { status: 404 });
     }
 
     console.log('[Orders API] Skin found:', { id: skin.id, name: skin.name, price: skin.price });
@@ -332,7 +331,7 @@ export async function POST(request: NextRequest) {
     const positionValue = estimatedPrice * quantity;
     const requiredMargin = positionValue * 0.2; // 20% margin requirement
 
-    console.log('[Orders API] Margin calculation:', {
+    console.log('[Orders API] Step 4: Margin calculation:', {
       estimatedPrice,
       positionValue,
       requiredMargin,
@@ -354,11 +353,12 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log('[Orders API] Balance check passed, placing order...');
+    console.log('[Orders API] Step 5: Balance check passed, initializing order matching engine...');
 
     // Initialize order matching engine with real skin ID
     const engine = new OrderMatchingEngine(realSkinId);
 
+    console.log('[Orders API] Step 6: Placing order in matching engine...');
     // Place the order with timeout
     const result = await withTimeout(
       engine.placeOrder({
@@ -370,17 +370,19 @@ export async function POST(request: NextRequest) {
         quantity,
         timeInForce
       }),
-      15000 // 15 second timeout for order placement
+      20000, // 20 second timeout for order placement
+      'Order placement in matching engine'
     );
 
-    console.log('[Orders API] Order placed in engine:', {
+    console.log('[Orders API] Step 7: Order placed in engine:', {
       orderId: result.orderId,
-      fillsCount: result.matchResult.fills.length
+      fillsCount: result.matchResult.fills.length,
+      updatedOrdersCount: result.matchResult.updatedOrders.length
     });
 
     // If order was filled (fully or partially), create positions and update balance
     if (result.matchResult.fills.length > 0) {
-      console.log('[Orders API] Order has fills, creating position and updating balance...');
+      console.log('[Orders API] Step 8: Order has fills, creating position and updating balance...');
       
       await withTimeout(
         PrismaClientSingleton.executeWithRetry(
@@ -467,12 +469,14 @@ export async function POST(request: NextRequest) {
           },
           'create position and update balance'
         ),
-        20000 // 20 second timeout for transaction
+        25000, // 25 second timeout for transaction
+        'Position creation and balance update'
       );
     } else {
-      console.log('[Orders API] Order placed but no fills (limit order in order book)');
+      console.log('[Orders API] Step 8: Order placed but no fills (limit order in order book)');
     }
 
+    console.log('[Orders API] Step 9: Fetching updated order details...');
     // Get updated order details
     const updatedOrder = await withTimeout(
       PrismaClientSingleton.executeWithRetry(
@@ -487,7 +491,8 @@ export async function POST(request: NextRequest) {
         },
         'fetch updated order details'
       ),
-      10000 // 10 second timeout
+      10000, // 10 second timeout
+      'Updated order fetch'
     );
 
     if (!updatedOrder) {
@@ -495,12 +500,14 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to fetch updated order details');
     }
 
-    console.log(`[Orders API] Order placed successfully: ${result.orderId}`);
-    console.log(`[Orders API] Final order status: ${updatedOrder.status}`);
-    console.log(`[Orders API] Match result:`, { 
-      fills: result.matchResult.fills.length,
-      remainingQty: updatedOrder.remainingQty
-    });
+    const totalTime = Date.now() - startTime;
+    console.log(`[Orders API] === ORDER PLACEMENT SUCCESS ===`);
+    console.log(`[Orders API] Order ID: ${result.orderId}`);
+    console.log(`[Orders API] Final status: ${updatedOrder.status}`);
+    console.log(`[Orders API] Remaining quantity: ${updatedOrder.remainingQty}`);
+    console.log(`[Orders API] Fills: ${result.matchResult.fills.length}`);
+    console.log(`[Orders API] Total processing time: ${totalTime}ms`);
+    console.log(`[Orders API] === END ===`);
 
     return NextResponse.json({
       order: updatedOrder,
@@ -508,18 +515,26 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[Orders API] Error placing order:', error);
+    const totalTime = Date.now() - startTime;
+    console.error('[Orders API] === ORDER PLACEMENT FAILED ===');
+    console.error('[Orders API] Error:', error);
     console.error('[Orders API] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error(`[Orders API] Total processing time: ${totalTime}ms`);
+    console.error('[Orders API] === END ===');
     
     // Return more specific error information
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     const isTimeoutError = errorMessage.includes('timed out');
+    const isDatabaseError = errorMessage.includes('database') || errorMessage.includes('prisma') || errorMessage.includes('connection');
     
     return NextResponse.json({ 
       error: 'Failed to place order',
       details: errorMessage,
-      type: isTimeoutError ? 'timeout' : 'general',
-      suggestion: isTimeoutError ? 'Please try again. The system may be experiencing high load.' : 'Please check your order details and try again.'
+      type: isTimeoutError ? 'timeout' : isDatabaseError ? 'database' : 'general',
+      suggestion: isTimeoutError ? 'Please try again. The system may be experiencing high load.' : 
+                  isDatabaseError ? 'Database connection issue. Please try again in a moment.' :
+                  'Please check your order details and try again.',
+      processingTime: totalTime
     }, { status: 500 });
   }
 } 

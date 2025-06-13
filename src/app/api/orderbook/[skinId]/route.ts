@@ -10,20 +10,31 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { skinId: string } }
 ) {
+  const startTime = Date.now();
+  
   try {
     const { skinId } = params;
     const { searchParams } = new URL(request.url);
     const levels = parseInt(searchParams.get('levels') || '10');
 
-    console.log(`[OrderBook API] Fetching order book for skin: ${skinId}, levels: ${levels}`);
-    console.log(`[OrderBook API] Should use mock data: ${shouldUseMockData()}`);
+    console.log(`[OrderBook API] === ORDER BOOK REQUEST START ===`);
+    console.log(`[OrderBook API] Timestamp: ${new Date().toISOString()}`);
+    console.log(`[OrderBook API] Skin ID: ${skinId}`);
+    console.log(`[OrderBook API] Levels requested: ${levels}`);
+    console.log(`[OrderBook API] Environment check:`);
+    console.log(`[OrderBook API] - NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`[OrderBook API] - VERCEL: ${process.env.VERCEL}`);
+    console.log(`[OrderBook API] - DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
+    console.log(`[OrderBook API] - Should use mock data: ${shouldUseMockData()}`);
 
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('[OrderBook API] Using mock data - real orders only');
+      console.log('[OrderBook API] Using mock data path');
       
       // Get only real user orders
       const mockOrderBook = getMockOrderBook(skinId);
+      
+      console.log(`[OrderBook API] Mock order book - Bids: ${mockOrderBook.bids.length}, Asks: ${mockOrderBook.asks.length}`);
       
       return NextResponse.json({
         orderBook: mockOrderBook,
@@ -49,16 +60,19 @@ export async function GET(
       });
     }
 
-    console.log('[OrderBook API] Using real database');
+    console.log('[OrderBook API] === REAL DATABASE PATH ===');
 
     // Initialize order matching engine with timeout
     const engine = new OrderMatchingEngine(skinId);
 
+    console.log('[OrderBook API] Step 1: Initializing order matching engine...');
+
     // Get order book data with timeout and error handling
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Database query timeout')), 10000)
+      setTimeout(() => reject(new Error('Database query timeout after 15 seconds')), 15000)
     );
 
+    console.log('[OrderBook API] Step 2: Fetching order book data...');
     const dataPromise = Promise.all([
       engine.getOrderBook(),
       engine.getOrderBookDepth(levels),
@@ -71,18 +85,55 @@ export async function GET(
       timeoutPromise
     ]) as any;
 
-    console.log(`[OrderBook API] Successfully fetched data - bids: ${orderBook.bids.length}, asks: ${orderBook.asks.length}`);
+    console.log(`[OrderBook API] Step 3: Data fetched successfully`);
+    console.log(`[OrderBook API] - Order book bids: ${orderBook.bids.length}`);
+    console.log(`[OrderBook API] - Order book asks: ${orderBook.asks.length}`);
+    console.log(`[OrderBook API] - Order book depth bids: ${orderBookDepth.bids.length}`);
+    console.log(`[OrderBook API] - Order book depth asks: ${orderBookDepth.asks.length}`);
+    console.log(`[OrderBook API] - Best bid: ${bestPrices.bestBid}`);
+    console.log(`[OrderBook API] - Best ask: ${bestPrices.bestAsk}`);
+    console.log(`[OrderBook API] - Market price: ${marketPrice}`);
+
+    // Log detailed order information for debugging
+    if (orderBook.bids.length > 0) {
+      console.log('[OrderBook API] Sample bid orders:');
+      orderBook.bids.slice(0, 3).forEach((bid: any, index: number) => {
+        console.log(`[OrderBook API] Bid ${index + 1}: ID=${bid.id}, Price=${bid.price}, Qty=${bid.remainingQty}, User=${bid.userId}`);
+      });
+    }
+
+    if (orderBook.asks.length > 0) {
+      console.log('[OrderBook API] Sample ask orders:');
+      orderBook.asks.slice(0, 3).forEach((ask: any, index: number) => {
+        console.log(`[OrderBook API] Ask ${index + 1}: ID=${ask.id}, Price=${ask.price}, Qty=${ask.remainingQty}, User=${ask.userId}`);
+      });
+    }
+
+    const totalTime = Date.now() - startTime;
+    console.log(`[OrderBook API] === ORDER BOOK SUCCESS ===`);
+    console.log(`[OrderBook API] Total processing time: ${totalTime}ms`);
+    console.log(`[OrderBook API] === END ===`);
 
     return NextResponse.json({
       orderBook,
       orderBookDepth,
       bestPrices,
       marketPrice,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      debug: {
+        processingTime: totalTime,
+        totalBids: orderBook.bids.length,
+        totalAsks: orderBook.asks.length
+      }
     });
 
   } catch (error) {
-    console.error('[OrderBook API] Error fetching order book:', error);
+    const totalTime = Date.now() - startTime;
+    console.error('[OrderBook API] === ORDER BOOK FAILED ===');
+    console.error('[OrderBook API] Error:', error);
+    console.error('[OrderBook API] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error(`[OrderBook API] Total processing time: ${totalTime}ms`);
+    console.error('[OrderBook API] === END ===');
     
     // Return empty order book on error instead of 500
     return NextResponse.json({
@@ -91,7 +142,11 @@ export async function GET(
       bestPrices: { bestBid: 0, bestAsk: 0, spread: 0 },
       marketPrice: 0,
       timestamp: new Date().toISOString(),
-      error: 'Failed to fetch order book data'
+      error: 'Failed to fetch order book data',
+      debug: {
+        processingTime: totalTime,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      }
     });
   }
 } 
