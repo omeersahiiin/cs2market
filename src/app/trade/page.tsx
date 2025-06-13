@@ -197,8 +197,12 @@ export default function TradePage() {
     });
   };
 
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
   const handlePlaceOrder = async () => {
-    if (!selectedSkin || !session) return;
+    if (!selectedSkin || !session || isPlacingOrder) return;
+    
+    setIsPlacingOrder(true);
     
     try {
       console.log('Placing order:', {
@@ -225,15 +229,15 @@ export default function TradePage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to place order');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
       console.log('Order placed successfully:', result);
 
       // Show success message
-      alert(`Order placed successfully! Order ID: ${result.order.id}`);
+      alert(`Order placed successfully! Order ID: ${result.order?.id || 'Unknown'}`);
       
       // Reset form
       setOrderForm(prev => ({
@@ -247,7 +251,10 @@ export default function TradePage() {
 
     } catch (error) {
       console.error('Error placing order:', error);
-      alert(`Failed to place order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to place order: ${errorMessage}`);
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
@@ -580,20 +587,20 @@ export default function TradePage() {
                       handleOrderFormChange('side', 'buy');
                       await handlePlaceOrder();
                     }}
-                    disabled={!selectedSkin || orderForm.quantity <= 0 || ((orderForm.type === 'limit' || orderForm.type === 'stop') && orderForm.price <= 0)}
+                    disabled={!selectedSkin || isPlacingOrder || orderForm.quantity <= 0 || ((orderForm.type === 'limit' || orderForm.type === 'stop') && orderForm.price <= 0)}
                     className="py-4 px-4 rounded-lg font-semibold text-base transition-colors bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Buy/Long
+                    {isPlacingOrder && orderForm.side === 'buy' ? 'Placing...' : 'Buy/Long'}
                   </button>
                   <button
                     onClick={async () => {
                       handleOrderFormChange('side', 'sell');
                       await handlePlaceOrder();
                     }}
-                    disabled={!selectedSkin || orderForm.quantity <= 0 || ((orderForm.type === 'limit' || orderForm.type === 'stop') && orderForm.price <= 0)}
+                    disabled={!selectedSkin || isPlacingOrder || orderForm.quantity <= 0 || ((orderForm.type === 'limit' || orderForm.type === 'stop') && orderForm.price <= 0)}
                     className="py-4 px-4 rounded-lg font-semibold text-base transition-colors bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Sell/Short
+                    {isPlacingOrder && orderForm.side === 'sell' ? 'Placing...' : 'Sell/Short'}
                   </button>
                 </div>
               </div>

@@ -4,18 +4,7 @@ import { authOptions } from '@/lib/auth';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
 import { shouldUseMockData, MOCK_SKINS, addMockOrder, addMockTrade, getMockOrders } from '@/lib/mock-data';
 import { mapMockIdToRealId, isMockId } from '@/lib/skin-id-mapping';
-
-// Conditional Prisma imports for when database is available
-let prisma: any = null;
-let Prisma: any = null;
-
-try {
-  const { PrismaClient, Prisma: PrismaTypes } = require('@prisma/client');
-  prisma = new PrismaClient();
-  Prisma = PrismaTypes;
-} catch (error) {
-  console.log('Prisma not available, using mock mode');
-}
+import { PrismaClientSingleton } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,9 +36,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ orders: filteredOrders });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
+    const user = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.user.findUnique({
+          where: { email: session.user.email }
+        });
+      },
+      'fetch user for orders'
+    );
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -65,18 +59,23 @@ export async function GET(request: NextRequest) {
     // Map mock skin ID to real database ID if needed
     const realSkinId = skinId && isMockId(skinId) ? mapMockIdToRealId(skinId) : skinId;
 
-    const orders = await prisma.order.findMany({
-      where: {
-        userId: user.id,
-        ...(realSkinId && { skinId: realSkinId }),
-        ...(statusFilter && { status: { in: statusFilter } })
+    const orders = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.order.findMany({
+          where: {
+            userId: user.id,
+            ...(realSkinId && { skinId: realSkinId }),
+            ...(statusFilter && { status: { in: statusFilter } })
+          },
+          include: {
+            skin: true,
+            fills: true
+          },
+          orderBy: { createdAt: 'desc' }
+        });
       },
-      include: {
-        skin: true,
-        fills: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+      'fetch user orders'
+    );
 
     return NextResponse.json({ orders });
   } catch (error) {
@@ -195,9 +194,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
+    const user = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.user.findUnique({
+          where: { email: session.user.email }
+        });
+      },
+      'fetch user for order placement'
+    );
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -208,14 +212,24 @@ export async function POST(request: NextRequest) {
     console.log(`Mapping skin ID: ${skinId} -> ${realSkinId}`);
 
     // Check if skin exists
-    const skin = await prisma.skin.findUnique({
-      where: { id: realSkinId }
-    });
+    const skin = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.skin.findUnique({
+          where: { id: realSkinId }
+        });
+      },
+      'fetch skin for order placement'
+    );
 
     if (!skin) {
       console.error(`Skin not found with ID: ${skinId} (mapped to: ${realSkinId})`);
       console.log('Available skin IDs in database:');
-      const allSkins = await prisma.skin.findMany({ select: { id: true, name: true } });
+      const allSkins = await PrismaClientSingleton.executeWithRetry(
+        async (prisma) => {
+          return await prisma.skin.findMany({ select: { id: true, name: true } });
+        },
+        'fetch all skins for error logging'
+      );
       allSkins.forEach((s: any) => console.log(`- ${s.id}: ${s.name}`));
       return NextResponse.json({ 
         error: 'Skin not found',
@@ -254,72 +268,82 @@ export async function POST(request: NextRequest) {
 
     // If order was filled (fully or partially), create positions and update balance
     if (result.matchResult.fills.length > 0) {
-      await prisma.$transaction(async (tx: any) => {
-        // Calculate total filled quantity and average fill price
-        const userFills = result.matchResult.fills.filter(
-          fill => fill.buyUserId === user.id || fill.sellUserId === user.id
-        );
-        
-        const totalFilledQty = userFills.reduce((sum, fill) => sum + fill.quantity, 0);
-        const avgFillPrice = userFills.reduce((sum, fill) => sum + (fill.price * fill.quantity), 0) / totalFilledQty;
-        
-        if (totalFilledQty > 0) {
-          // Calculate commission (0.02% of trade value)
-          const tradeValue = avgFillPrice * totalFilledQty;
-          const commission = tradeValue * 0.0002; // 0.02%
-          
-          // Create position for filled quantity
-          await tx.position.create({
-            data: {
-              userId: user.id,
-              skinId: realSkinId,
-              type: positionType,
-              entryPrice: avgFillPrice,
-              size: totalFilledQty,
-              margin: avgFillPrice * totalFilledQty * 0.2
-            }
-          });
-
-          // Deduct margin + commission from user balance
-          const marginUsed = avgFillPrice * totalFilledQty * 0.2;
-          const totalDeduction = marginUsed + commission;
-          
-          await tx.user.update({
-            where: { id: user.id },
-            data: {
-              balance: {
-                decrement: totalDeduction
-              }
-            }
-          });
-
-          // Transfer commission to market maker account
-          const marketMaker = await tx.user.findUnique({
-            where: { email: 'marketmaker@cs2derivatives.com' }
-          });
-          
-          if (marketMaker) {
-            await tx.user.update({
-              where: { id: marketMaker.id },
-              data: {
-                balance: {
-                  increment: commission
+      await PrismaClientSingleton.executeWithRetry(
+        async (prisma) => {
+          return await prisma.$transaction(async (tx: any) => {
+            // Calculate total filled quantity and average fill price
+            const userFills = result.matchResult.fills.filter(
+              fill => fill.buyUserId === user.id || fill.sellUserId === user.id
+            );
+            
+            const totalFilledQty = userFills.reduce((sum, fill) => sum + fill.quantity, 0);
+            const avgFillPrice = userFills.reduce((sum, fill) => sum + (fill.price * fill.quantity), 0) / totalFilledQty;
+            
+            if (totalFilledQty > 0) {
+              // Calculate commission (0.02% of trade value)
+              const tradeValue = avgFillPrice * totalFilledQty;
+              const commission = tradeValue * 0.0002; // 0.02%
+              
+              // Create position for filled quantity
+              await tx.position.create({
+                data: {
+                  userId: user.id,
+                  skinId: realSkinId,
+                  type: positionType,
+                  entryPrice: avgFillPrice,
+                  size: totalFilledQty,
+                  margin: avgFillPrice * totalFilledQty * 0.2
                 }
+              });
+
+              // Deduct margin + commission from user balance
+              const marginUsed = avgFillPrice * totalFilledQty * 0.2;
+              const totalDeduction = marginUsed + commission;
+              
+              await tx.user.update({
+                where: { id: user.id },
+                data: {
+                  balance: {
+                    decrement: totalDeduction
+                  }
+                }
+              });
+
+              // Transfer commission to market maker account
+              const marketMaker = await tx.user.findUnique({
+                where: { email: 'marketmaker@cs2derivatives.com' }
+              });
+              
+              if (marketMaker) {
+                await tx.user.update({
+                  where: { id: marketMaker.id },
+                  data: {
+                    balance: {
+                      increment: commission
+                    }
+                  }
+                });
               }
-            });
-          }
-        }
-      });
+            }
+          });
+        },
+        'create position and update balance'
+      );
     }
 
     // Get updated order details
-    const updatedOrder = await prisma.order.findUnique({
-      where: { id: result.orderId },
-      include: {
-        skin: true,
-        fills: true
-      }
-    });
+    const updatedOrder = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.order.findUnique({
+          where: { id: result.orderId },
+          include: {
+            skin: true,
+            fills: true
+          }
+        });
+      },
+      'fetch updated order details'
+    );
 
     return NextResponse.json({
       order: updatedOrder,
