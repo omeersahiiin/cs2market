@@ -121,27 +121,42 @@ export default function TradePage() {
     fetchSkins();
   }, []);
 
-  // Generate mock positions
+  // Fetch real positions from API
   useEffect(() => {
-    if (skins.length > 0) {
-      const mockPositions: Position[] = [
-        {
-          id: '1',
-          skinId: skins[0]?.id || '',
-          skinName: skins[0]?.name || '',
-          side: 'long',
-          quantity: 2,
-          entryPrice: skins[0]?.price * 0.95 || 1000,
-          currentPrice: skins[0]?.price || 1000,
-          pnl: (skins[0]?.price || 1000) * 2 * 0.05,
-          pnlPercent: 5.2,
-          margin: 500,
-          timestamp: new Date(Date.now() - 3600000).toISOString()
+    const fetchPositions = async () => {
+      if (!session) return;
+      
+      try {
+        const response = await fetch('/api/positions');
+        if (response.ok) {
+          const data = await response.json();
+          const formattedPositions: Position[] = data.map((pos: any) => ({
+            id: pos.id,
+            skinId: pos.skinId,
+            skinName: pos.skin?.name || 'Unknown Skin',
+            side: pos.type.toLowerCase() as 'long' | 'short',
+            quantity: pos.size,
+            entryPrice: pos.entryPrice,
+            currentPrice: pos.skin?.price || pos.entryPrice,
+            pnl: pos.type === 'LONG' 
+              ? (pos.skin?.price || pos.entryPrice - pos.entryPrice) * pos.size
+              : (pos.entryPrice - (pos.skin?.price || pos.entryPrice)) * pos.size,
+            pnlPercent: pos.type === 'LONG'
+              ? ((pos.skin?.price || pos.entryPrice) - pos.entryPrice) / pos.entryPrice * 100
+              : (pos.entryPrice - (pos.skin?.price || pos.entryPrice)) / pos.entryPrice * 100,
+            margin: pos.margin,
+            timestamp: pos.createdAt
+          }));
+          setPositions(formattedPositions);
         }
-      ];
-      setPositions(mockPositions);
-    }
-  }, [skins]);
+      } catch (error) {
+        console.error('Error fetching positions:', error);
+        setPositions([]); // Clear positions on error
+      }
+    };
+
+    fetchPositions();
+  }, [session, skins]);
 
   const filteredSkins = skins.filter(skin =>
     skin.name.toLowerCase().includes(searchTerm.toLowerCase())
