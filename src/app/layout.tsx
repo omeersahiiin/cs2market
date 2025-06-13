@@ -4,6 +4,7 @@ import AuthProvider from '@/components/providers/AuthProvider';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import SystemInitializer from '@/components/SystemInitializer';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,14 +21,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-[#0F1419] text-white`}>
-        <AuthProvider>
-          <SystemInitializer />
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <SystemInitializer />
+            <div className="min-h-screen flex flex-col">
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
