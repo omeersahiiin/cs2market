@@ -7,6 +7,7 @@ import { mapMockIdToRealId, isMockId } from '@/lib/skin-id-mapping';
 import { PrismaClientSingleton } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // Mock orders data - this will be populated dynamically
 let MOCK_ORDERS: any[] = [];
@@ -19,9 +20,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    console.log(`[Orders API] Fetching orders for user: ${session.user.email}`);
+    console.log(`[Orders API] Should use mock data: ${shouldUseMockData()}`);
+
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('Using mock orders data');
+      console.log('[Orders API] Using mock orders data');
       
       const { searchParams } = new URL(request.url);
       const skinId = searchParams.get('skinId');
@@ -77,10 +81,16 @@ export async function GET(request: NextRequest) {
       'fetch user orders'
     );
 
+    console.log(`[Orders API] Successfully fetched ${orders.length} orders`);
     return NextResponse.json({ orders });
   } catch (error) {
-    console.error('Error fetching orders:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[Orders API] Error fetching orders:', error);
+    
+    // Return empty orders array on error instead of 500
+    return NextResponse.json({ 
+      orders: [],
+      error: 'Failed to fetch orders'
+    });
   }
 }
 
@@ -94,6 +104,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { skinId, side, orderType, positionType, price, quantity, timeInForce } = body;
+
+    console.log(`[Orders API] Placing order for user: ${session.user.email}`);
+    console.log(`[Orders API] Order details:`, { skinId, side, orderType, positionType, price, quantity });
+    console.log(`[Orders API] Should use mock data: ${shouldUseMockData()}`);
 
     // Validate required fields
     if (!skinId || !side || !orderType || !positionType || !quantity) {
@@ -345,13 +359,24 @@ export async function POST(request: NextRequest) {
       'fetch updated order details'
     );
 
+    console.log(`[Orders API] Order placed successfully: ${result.orderId}`);
+    console.log(`[Orders API] Match result:`, { 
+      fills: result.matchResult.fills.length
+    });
+
     return NextResponse.json({
       order: updatedOrder,
       matchResult: result.matchResult
     });
 
   } catch (error) {
-    console.error('Error placing order:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[Orders API] Error placing order:', error);
+    
+    // Return more specific error information
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return NextResponse.json({ 
+      error: 'Failed to place order',
+      details: errorMessage
+    }, { status: 500 });
   }
 } 

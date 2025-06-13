@@ -3,6 +3,7 @@ import OrderMatchingEngine from '@/lib/orderMatchingEngine';
 import { shouldUseMockData, getMockOrderBook, resetMockOrderBook } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // GET /api/orderbook/[skinId] - Get order book for a skin
 export async function GET(
@@ -14,9 +15,12 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const levels = parseInt(searchParams.get('levels') || '10');
 
+    console.log(`[OrderBook API] Fetching order book for skin: ${skinId}, levels: ${levels}`);
+    console.log(`[OrderBook API] Should use mock data: ${shouldUseMockData()}`);
+
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('Using real orders only for skin:', skinId);
+      console.log('[OrderBook API] Using mock data - real orders only');
       
       // Get only real user orders
       const mockOrderBook = getMockOrderBook(skinId);
@@ -45,16 +49,29 @@ export async function GET(
       });
     }
 
-    // Initialize order matching engine
+    console.log('[OrderBook API] Using real database');
+
+    // Initialize order matching engine with timeout
     const engine = new OrderMatchingEngine(skinId);
 
-    // Get order book data
-    const [orderBook, orderBookDepth, bestPrices, marketPrice] = await Promise.all([
+    // Get order book data with timeout and error handling
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database query timeout')), 10000)
+    );
+
+    const dataPromise = Promise.all([
       engine.getOrderBook(),
       engine.getOrderBookDepth(levels),
       engine.getBestPrices(),
       engine.getMarketPrice()
     ]);
+
+    const [orderBook, orderBookDepth, bestPrices, marketPrice] = await Promise.race([
+      dataPromise,
+      timeoutPromise
+    ]) as any;
+
+    console.log(`[OrderBook API] Successfully fetched data - bids: ${orderBook.bids.length}, asks: ${orderBook.asks.length}`);
 
     return NextResponse.json({
       orderBook,
@@ -65,7 +82,16 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching order book:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[OrderBook API] Error fetching order book:', error);
+    
+    // Return empty order book on error instead of 500
+    return NextResponse.json({
+      orderBook: { bids: [], asks: [] },
+      orderBookDepth: { bids: [], asks: [] },
+      bestPrices: { bestBid: 0, bestAsk: 0, spread: 0 },
+      marketPrice: 0,
+      timestamp: new Date().toISOString(),
+      error: 'Failed to fetch order book data'
+    });
   }
 } 

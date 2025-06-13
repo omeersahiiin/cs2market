@@ -619,10 +619,16 @@ export const MOCK_WEAR_ANALYSIS = {
 
 // Function to determine if we should use mock data
 export function shouldUseMockData(): boolean {
-  // Check if DATABASE_URL is properly configured
+  // In production (Vercel), always use real database
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    return false;
+  }
+  
+  // Check if DATABASE_URL is properly configured for development
   const hasValidDatabase = process.env.DATABASE_URL && 
     process.env.DATABASE_URL !== 'postgresql://mock:mock@localhost:5432/mock' &&
-    !process.env.DATABASE_URL.includes('mock');
+    !process.env.DATABASE_URL.includes('mock') &&
+    process.env.DATABASE_URL.includes('supabase');
   
   // Use real database if properly configured, otherwise use mock data
   return !hasValidDatabase;
