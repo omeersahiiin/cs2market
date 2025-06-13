@@ -552,7 +552,7 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
               <div className="flex items-center space-x-2 p-2 bg-[#23262F] rounded">
                 <span className="text-green-400">💡</span>
                 <div>
-                  <p className="text-white font-medium">Best Value: {insights.bestValue}</p>
+                  <p className="text-white font-medium">Best Value: {insights?.bestValue || 'N/A'}</p>
                   <p className="text-gray-400">Good balance of price and quality</p>
                 </div>
               </div>
@@ -568,7 +568,7 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
               <div className="flex items-center space-x-2 p-2 bg-[#23262F] rounded">
                 <span className="text-yellow-400">⚡</span>
                 <div>
-                  <p className="text-white font-medium">Price spread: {insights.priceSpread}%</p>
+                  <p className="text-white font-medium">Price spread: {insights?.priceSpread || '0'}%</p>
                   <p className="text-gray-400">Difference between best and worst condition</p>
                 </div>
               </div>
