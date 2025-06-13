@@ -85,51 +85,91 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
   const [expandedSection, setExpandedSection] = useState<'overview' | 'calculator' | 'tips' | null>('overview');
 
   useEffect(() => {
-    fetchFloatAnalysis();
-  }, [skinId]);
-
-  const fetchFloatAnalysis = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/skins/${skinId}/float-analysis`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch float analysis');
+    const fetchAnalysis = async () => {
+      if (!skinId || !skinName) {
+        setError('Missing skin information');
+        setLoading(false);
+        return;
       }
-      
-      const data = await response.json();
-      setAnalysis(data.floatAnalysis);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load float analysis');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      try {
+        setLoading(true);
+        setError(null);
+        console.log(`[FloatAnalysis] Fetching analysis for ${skinName} (${skinId})`);
+        
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Request timed out')), 10000); // 10 second timeout
+        });
+
+        const fetchPromise = fetch(`/api/skins/${skinId}/float-analysis`);
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.warn(`[FloatAnalysis] Analysis not available for ${skinName}`);
+            setError('Float analysis not available for this skin');
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return;
+        }
+
+        const data = await response.json();
+        console.log(`[FloatAnalysis] Analysis loaded for ${skinName}:`, data);
+        setAnalysis(data.floatAnalysis);
+      } catch (err) {
+        console.error(`[FloatAnalysis] Error fetching analysis for ${skinName}:`, err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load float analysis';
+        
+        if (errorMessage.includes('timed out')) {
+          setError('Request timed out. Please try again.');
+        } else {
+          setError('Float analysis temporarily unavailable');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalysis();
+  }, [skinId, skinName]);
 
   const calculatePriceImpact = async () => {
     const floatValue = parseFloat(floatInput);
-    
     if (isNaN(floatValue) || floatValue < 0 || floatValue > 1) {
       alert('Please enter a valid float value between 0 and 1');
       return;
     }
 
+    setCalculatingImpact(true);
     try {
-      setCalculatingImpact(true);
-      const response = await fetch(`/api/skins/${skinId}/float-analysis`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ floatValue })
+      console.log(`[FloatAnalysis] Calculating price impact for float ${floatValue}`);
+      
+      // Add timeout for price impact calculation
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Calculation timed out')), 8000); // 8 second timeout
       });
 
+      const fetchPromise = fetch(`/api/skins/${skinId}/float-impact?float=${floatValue}`);
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      
       if (!response.ok) {
-        throw new Error('Failed to calculate price impact');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log(`[FloatAnalysis] Price impact calculated:`, data);
       setPriceImpact(data.priceImpact);
     } catch (err) {
-      alert('Failed to calculate price impact');
+      console.error('[FloatAnalysis] Error calculating price impact:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Calculation failed';
+      
+      if (errorMessage.includes('timed out')) {
+        alert('Calculation timed out. Please try again.');
+      } else {
+        alert('Failed to calculate price impact. Please try again.');
+      }
     } finally {
       setCalculatingImpact(false);
     }
@@ -160,7 +200,8 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
   };
 
   // Helper function to get simple trading insights
-  const getSimpleInsights = (analysis: FloatAnalysisType) => {
+  const getSimpleInsights = (analysis: FloatAnalysisType | null) => {
+    if (!analysis) return null;
     const wears = Object.entries(analysis.wearConditions);
     const prices = wears.map(([_, data]) => data.avgPrice);
     const maxPrice = Math.max(...prices);
@@ -187,29 +228,83 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
   if (loading) {
     return (
       <div className="bg-[#23262F] p-4 rounded-2xl shadow-lg">
-        <h3 className="text-lg font-semibold text-white mb-3">Float Analysis</h3>
-        <div className="flex items-center justify-center p-4">
+        <h3 className="font-semibold mb-2 text-white">Float Analysis</h3>
+        <div className="flex items-center justify-center p-6">
           <div className="text-center">
             <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            <p className="text-gray-400 text-sm">Loading...</p>
+            <p className="text-gray-400 text-sm">Loading float analysis...</p>
+            <p className="text-gray-500 text-xs mt-1">This may take a few seconds</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (error || !analysis) {
+  if (error) {
     return (
       <div className="bg-[#23262F] p-4 rounded-2xl shadow-lg">
-        <h3 className="text-lg font-semibold text-white mb-3">Float Analysis</h3>
-        <div className="text-center p-4">
-          <p className="text-red-400 mb-3 text-sm">{error || 'No float data available'}</p>
-          <button
-            onClick={fetchFloatAnalysis}
-            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-          >
-            Retry
-          </button>
+        <h3 className="font-semibold mb-2 text-white">Float Analysis</h3>
+        <div className="flex items-center justify-center p-6">
+          <div className="text-center">
+            <div className="text-red-400 mb-2">⚠️</div>
+            <p className="text-red-400 text-sm mb-2">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                // Trigger re-fetch by updating a dependency
+                const fetchAnalysis = async () => {
+                  try {
+                    setLoading(true);
+                    setError(null);
+                    
+                    const timeoutPromise = new Promise<never>((_, reject) => {
+                      setTimeout(() => reject(new Error('Request timed out')), 10000);
+                    });
+
+                    const fetchPromise = fetch(`/api/skins/${skinId}/float-analysis`);
+                    const response = await Promise.race([fetchPromise, timeoutPromise]);
+                    
+                    if (!response.ok) {
+                      if (response.status === 404) {
+                        setError('Float analysis not available for this skin');
+                      } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                      }
+                      return;
+                    }
+
+                             const data = await response.json();
+         setAnalysis(data);
+                  } catch (err) {
+                    console.error('[FloatAnalysis] Retry failed:', err);
+                    const errorMessage = err instanceof Error ? err.message : 'Failed to load float analysis';
+                    setError(errorMessage.includes('timed out') ? 'Request timed out. Please try again.' : 'Float analysis temporarily unavailable');
+                  } finally {
+                    setLoading(false);
+                  }
+                };
+                fetchAnalysis();
+              }}
+              className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Return early if no analysis data
+  if (!analysis) {
+    return (
+      <div className="bg-[#23262F] p-4 rounded-2xl shadow-lg">
+        <h3 className="font-semibold mb-2 text-white">Float Analysis</h3>
+        <div className="flex items-center justify-center p-6">
+          <div className="text-center">
+            <p className="text-gray-400 text-sm">No analysis data available</p>
+          </div>
         </div>
       </div>
     );

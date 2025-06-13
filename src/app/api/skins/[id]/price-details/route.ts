@@ -7,14 +7,25 @@ const prisma = new PrismaClient();
 
 export const dynamic = 'force-dynamic';
 
+// Add timeout wrapper for API calls
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Operation timed out')), timeoutMs);
+  });
+  
+  return Promise.race([promise, timeoutPromise]);
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log(`[Price Details API] Fetching price details for skin: ${params.id}`);
+    
     // Check if we should use mock data
     if (shouldUseMockData()) {
-      console.log('Using mock price details data');
+      console.log('[Price Details API] Using mock price details data');
       
       // Find the mock skin
       const skin = MOCK_SKINS.find(s => s.id === params.id);
@@ -59,6 +70,7 @@ export async function GET(
         }
       };
 
+      console.log('[Price Details API] Mock data generated successfully');
       return NextResponse.json({
         skin: {
           id: skin.id,
@@ -78,37 +90,56 @@ export async function GET(
       });
     }
 
-    const skin = await prisma.skin.findUnique({
-      where: {
-        id: params.id
-      }
-    });
+    // Fetch skin with timeout
+    console.log('[Price Details API] Fetching skin from database...');
+    const skin = await withTimeout(
+      prisma.skin.findUnique({
+        where: { id: params.id }
+      }),
+      5000 // 5 second timeout
+    );
 
     if (!skin) {
+      console.log('[Price Details API] Skin not found in database');
       return NextResponse.json(
         { error: 'Skin not found' },
         { status: 404 }
       );
     }
 
-    // Get real-time market price information using ProfessionalPriceService
-    console.log(`🔍 Fetching professional real-time price details for ${skin.name}...`);
+    console.log(`[Price Details API] Skin found: ${skin.name}`);
+
+    // Get real-time market price information with timeout
+    console.log(`[Price Details API] Fetching professional real-time price details for ${skin.name}...`);
     
     try {
-      // Get professional pricing data with API keys
-      const priceInfo = await ProfessionalPriceService.fetchSkinPrice(skin.name, skin.wear);
+      // Get professional pricing data with API keys and timeout
+      const priceInfo = await withTimeout(
+        ProfessionalPriceService.fetchSkinPrice(skin.name, skin.wear),
+        8000 // 8 second timeout for external API
+      );
+      
       const averageMarketPrice = priceInfo.averagePrice;
+      console.log(`[Price Details API] Professional price fetched: $${averageMarketPrice}`);
       
       // Update the skin price in database if it's significantly different
       const currentPrice = parseFloat(skin.price.toString());
       const priceChange = Math.abs(averageMarketPrice - currentPrice) / currentPrice;
       
       if (priceChange > 0.01) { // 1% threshold
-        await prisma.skin.update({
-          where: { id: skin.id },
-          data: { price: averageMarketPrice }
-        });
-        console.log(`💰 Updated ${skin.name} price: $${currentPrice.toFixed(2)} → $${averageMarketPrice.toFixed(2)} (${priceInfo.confidence}% confidence)`);
+        try {
+          await withTimeout(
+            prisma.skin.update({
+              where: { id: skin.id },
+              data: { price: averageMarketPrice }
+            }),
+            3000 // 3 second timeout for database update
+          );
+          console.log(`[Price Details API] Updated ${skin.name} price: $${currentPrice.toFixed(2)} → $${averageMarketPrice.toFixed(2)} (${priceInfo.confidence}% confidence)`);
+        } catch (updateError) {
+          console.warn('[Price Details API] Failed to update skin price in database:', updateError);
+          // Continue with the response even if update fails
+        }
       }
 
       // Create comprehensive market price info with professional data
@@ -144,16 +175,17 @@ export async function GET(
         }
       };
 
-    return NextResponse.json({
-      skin: {
-        id: skin.id,
-        name: skin.name,
-        type: skin.type,
-        rarity: skin.rarity,
-        wear: skin.wear,
+      console.log('[Price Details API] Professional price data processed successfully');
+      return NextResponse.json({
+        skin: {
+          id: skin.id,
+          name: skin.name,
+          type: skin.type,
+          rarity: skin.rarity,
+          wear: skin.wear,
           currentPrice: averageMarketPrice // Use professional real-time price
-      },
-      priceDetails: marketPriceInfo
+        },
+        priceDetails: marketPriceInfo
       }, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -163,10 +195,11 @@ export async function GET(
       });
 
     } catch (priceError) {
-      console.error(`❌ Error fetching professional prices for ${skin.name}:`, priceError);
+      console.error(`[Price Details API] Error fetching professional prices for ${skin.name}:`, priceError);
       
       // Enhanced fallback with professional pricing
       const fallbackPrice = ProfessionalPriceService.getProfessionalFallbackPrice(skin.name, skin.wear);
+      console.log(`[Price Details API] Using fallback price: $${fallbackPrice}`);
 
       const fallbackPriceInfo = {
         tradingPrice: {
@@ -198,6 +231,7 @@ export async function GET(
         }
       };
 
+      console.log('[Price Details API] Fallback price data generated');
       return NextResponse.json({
         skin: {
           id: skin.id,
@@ -218,10 +252,26 @@ export async function GET(
     }
 
   } catch (error) {
-    console.error('Error fetching skin price details:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch price details' },
-      { status: 500 }
-    );
+    console.error('[Price Details API] Critical error:', error);
+    
+    // Return a basic response to prevent complete failure
+    return NextResponse.json({
+      error: 'Failed to fetch price details',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { 
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+  } finally {
+    // Ensure database connection is closed
+    try {
+      await prisma.$disconnect();
+    } catch (disconnectError) {
+      console.warn('[Price Details API] Error disconnecting from database:', disconnectError);
+    }
   }
 } 

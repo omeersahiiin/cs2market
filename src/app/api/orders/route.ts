@@ -99,10 +99,18 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
+      console.error('[Orders API] Unauthorized access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error('[Orders API] Failed to parse request body:', parseError);
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
     const { skinId, side, orderType, positionType, price, quantity, timeInForce } = body;
 
     console.log(`[Orders API] Placing order for user: ${session.user.email}`);
@@ -112,19 +120,45 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!skinId || !side || !orderType || !positionType || !quantity) {
       console.error('[Orders API] Missing required fields:', { skinId, side, orderType, positionType, quantity });
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Missing required fields',
+        details: 'skinId, side, orderType, positionType, and quantity are required'
+      }, { status: 400 });
     }
 
     // Validate order type and price
     if (orderType === 'LIMIT' && (!price || price <= 0)) {
       console.error('[Orders API] Invalid limit order price:', price);
-      return NextResponse.json({ error: 'Limit orders require a valid price' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Limit orders require a valid price',
+        details: 'Price must be greater than 0 for limit orders'
+      }, { status: 400 });
     }
 
     // Validate quantity
-    if (quantity <= 0) {
+    if (quantity <= 0 || !Number.isFinite(quantity)) {
       console.error('[Orders API] Invalid quantity:', quantity);
-      return NextResponse.json({ error: 'Quantity must be positive' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Quantity must be a positive number',
+        details: `Received quantity: ${quantity}`
+      }, { status: 400 });
+    }
+
+    // Validate side and position type
+    if (!['BUY', 'SELL'].includes(side.toUpperCase())) {
+      console.error('[Orders API] Invalid side:', side);
+      return NextResponse.json({ 
+        error: 'Invalid order side',
+        details: 'Side must be BUY or SELL'
+      }, { status: 400 });
+    }
+
+    if (!['LONG', 'SHORT'].includes(positionType.toUpperCase())) {
+      console.error('[Orders API] Invalid position type:', positionType);
+      return NextResponse.json({ 
+        error: 'Invalid position type',
+        details: 'Position type must be LONG or SHORT'
+      }, { status: 400 });
     }
 
     // Check if we should use mock data
@@ -215,18 +249,33 @@ export async function POST(request: NextRequest) {
     // Real database order placement
     console.log('[Orders API] Processing real database order...');
 
-    const user = await PrismaClientSingleton.executeWithRetry(
-      async (prisma) => {
-        return await prisma.user.findUnique({
-          where: { email: session.user.email }
-        });
-      },
-      'fetch user for order placement'
+    // Add timeout wrapper for database operations
+    const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+      });
+      
+      return Promise.race([promise, timeoutPromise]);
+    };
+
+    const user = await withTimeout(
+      PrismaClientSingleton.executeWithRetry(
+        async (prisma) => {
+          return await prisma.user.findUnique({
+            where: { email: session.user.email }
+          });
+        },
+        'fetch user for order placement'
+      ),
+      10000 // 10 second timeout
     );
 
     if (!user) {
       console.error('[Orders API] User not found:', session.user.email);
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ 
+        error: 'User not found',
+        details: 'User account not found in database'
+      }, { status: 404 });
     }
 
     console.log('[Orders API] User found:', { id: user.id, balance: user.balance });
@@ -236,30 +285,44 @@ export async function POST(request: NextRequest) {
     console.log(`[Orders API] Mapping skin ID: ${skinId} -> ${realSkinId}`);
 
     // Check if skin exists
-    const skin = await PrismaClientSingleton.executeWithRetry(
-      async (prisma) => {
-        return await prisma.skin.findUnique({
-          where: { id: realSkinId }
-        });
-      },
-      'fetch skin for order placement'
+    const skin = await withTimeout(
+      PrismaClientSingleton.executeWithRetry(
+        async (prisma) => {
+          return await prisma.skin.findUnique({
+            where: { id: realSkinId }
+          });
+        },
+        'fetch skin for order placement'
+      ),
+      10000 // 10 second timeout
     );
 
     if (!skin) {
       console.error(`[Orders API] Skin not found with ID: ${skinId} (mapped to: ${realSkinId})`);
       console.log('[Orders API] Available skin IDs in database:');
-      const allSkins = await PrismaClientSingleton.executeWithRetry(
-        async (prisma) => {
-          return await prisma.skin.findMany({ select: { id: true, name: true } });
-        },
-        'fetch all skins for error logging'
-      );
-      allSkins.forEach((s: any) => console.log(`- ${s.id}: ${s.name}`));
-      return NextResponse.json({ 
-        error: 'Skin not found',
-        details: `Skin ID "${skinId}" (mapped to "${realSkinId}") does not exist in database`,
-        availableSkins: allSkins.map((s: any) => ({ id: s.id, name: s.name }))
-      }, { status: 404 });
+      try {
+        const allSkins = await withTimeout(
+          PrismaClientSingleton.executeWithRetry(
+            async (prisma) => {
+              return await prisma.skin.findMany({ select: { id: true, name: true } });
+            },
+            'fetch all skins for error logging'
+          ),
+          5000 // 5 second timeout for error logging
+        );
+        allSkins.forEach((s: any) => console.log(`- ${s.id}: ${s.name}`));
+        return NextResponse.json({ 
+          error: 'Skin not found',
+          details: `Skin ID "${skinId}" (mapped to "${realSkinId}") does not exist in database`,
+          availableSkins: allSkins.map((s: any) => ({ id: s.id, name: s.name }))
+        }, { status: 404 });
+      } catch (skinListError) {
+        console.error('[Orders API] Failed to fetch skin list for error response:', skinListError);
+        return NextResponse.json({ 
+          error: 'Skin not found',
+          details: `Skin ID "${skinId}" (mapped to "${realSkinId}") does not exist in database`
+        }, { status: 404 });
+      }
     }
 
     console.log('[Orders API] Skin found:', { id: skin.id, name: skin.name, price: skin.price });
@@ -285,6 +348,7 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ 
         error: 'Insufficient balance for margin requirement',
+        details: `Required: $${requiredMargin.toFixed(2)}, Available: $${user.balance.toFixed(2)}`,
         required: requiredMargin,
         available: user.balance
       }, { status: 400 });
@@ -295,16 +359,19 @@ export async function POST(request: NextRequest) {
     // Initialize order matching engine with real skin ID
     const engine = new OrderMatchingEngine(realSkinId);
 
-    // Place the order
-    const result = await engine.placeOrder({
-      userId: user.id,
-      side: side as 'BUY' | 'SELL',
-      orderType: orderType as 'MARKET' | 'LIMIT',
-      positionType: positionType as 'LONG' | 'SHORT',
-      price: orderType === 'LIMIT' ? price : undefined,
-      quantity,
-      timeInForce
-    });
+    // Place the order with timeout
+    const result = await withTimeout(
+      engine.placeOrder({
+        userId: user.id,
+        side: side as 'BUY' | 'SELL',
+        orderType: orderType as 'MARKET' | 'LIMIT',
+        positionType: positionType as 'LONG' | 'SHORT',
+        price: orderType === 'LIMIT' ? price : undefined,
+        quantity,
+        timeInForce
+      }),
+      15000 // 15 second timeout for order placement
+    );
 
     console.log('[Orders API] Order placed in engine:', {
       orderId: result.orderId,
@@ -315,106 +382,112 @@ export async function POST(request: NextRequest) {
     if (result.matchResult.fills.length > 0) {
       console.log('[Orders API] Order has fills, creating position and updating balance...');
       
-      await PrismaClientSingleton.executeWithRetry(
-        async (prisma) => {
-          return await prisma.$transaction(async (tx: any) => {
-            // Calculate total filled quantity and average fill price
-            const userFills = result.matchResult.fills.filter(
-              fill => fill.buyUserId === user.id || fill.sellUserId === user.id
-            );
-            
-            const totalFilledQty = userFills.reduce((sum, fill) => sum + fill.quantity, 0);
-            const avgFillPrice = userFills.reduce((sum, fill) => sum + (fill.price * fill.quantity), 0) / totalFilledQty;
-            
-            console.log('[Orders API] Fill details:', {
-              userFillsCount: userFills.length,
-              totalFilledQty,
-              avgFillPrice
-            });
-            
-            if (totalFilledQty > 0) {
-              // Calculate commission (0.02% of trade value)
-              const tradeValue = avgFillPrice * totalFilledQty;
-              const commission = tradeValue * 0.0002; // 0.02%
+      await withTimeout(
+        PrismaClientSingleton.executeWithRetry(
+          async (prisma) => {
+            return await prisma.$transaction(async (tx: any) => {
+              // Calculate total filled quantity and average fill price
+              const userFills = result.matchResult.fills.filter(
+                fill => fill.buyUserId === user.id || fill.sellUserId === user.id
+              );
               
-              console.log('[Orders API] Creating position:', {
-                userId: user.id,
-                skinId: realSkinId,
-                type: positionType,
-                entryPrice: avgFillPrice,
-                size: totalFilledQty,
-                margin: avgFillPrice * totalFilledQty * 0.2
+              const totalFilledQty = userFills.reduce((sum, fill) => sum + fill.quantity, 0);
+              const avgFillPrice = userFills.reduce((sum, fill) => sum + (fill.price * fill.quantity), 0) / totalFilledQty;
+              
+              console.log('[Orders API] Fill details:', {
+                userFillsCount: userFills.length,
+                totalFilledQty,
+                avgFillPrice
               });
               
-              // Create position for filled quantity
-              await tx.position.create({
-                data: {
+              if (totalFilledQty > 0) {
+                // Calculate commission (0.02% of trade value)
+                const tradeValue = avgFillPrice * totalFilledQty;
+                const commission = tradeValue * 0.0002; // 0.02%
+                
+                console.log('[Orders API] Creating position:', {
                   userId: user.id,
                   skinId: realSkinId,
                   type: positionType,
                   entryPrice: avgFillPrice,
                   size: totalFilledQty,
                   margin: avgFillPrice * totalFilledQty * 0.2
-                }
-              });
-
-              // Deduct margin + commission from user balance
-              const marginUsed = avgFillPrice * totalFilledQty * 0.2;
-              const totalDeduction = marginUsed + commission;
-              
-              console.log('[Orders API] Updating user balance:', {
-                marginUsed,
-                commission,
-                totalDeduction,
-                newBalance: user.balance - totalDeduction
-              });
-              
-              await tx.user.update({
-                where: { id: user.id },
-                data: {
-                  balance: {
-                    decrement: totalDeduction
+                });
+                
+                // Create position for filled quantity
+                await tx.position.create({
+                  data: {
+                    userId: user.id,
+                    skinId: realSkinId,
+                    type: positionType,
+                    entryPrice: avgFillPrice,
+                    size: totalFilledQty,
+                    margin: avgFillPrice * totalFilledQty * 0.2
                   }
-                }
-              });
+                });
 
-              // Transfer commission to market maker account
-              const marketMaker = await tx.user.findUnique({
-                where: { email: 'marketmaker@cs2derivatives.com' }
-              });
-              
-              if (marketMaker) {
+                // Deduct margin + commission from user balance
+                const marginUsed = avgFillPrice * totalFilledQty * 0.2;
+                const totalDeduction = marginUsed + commission;
+                
+                console.log('[Orders API] Updating user balance:', {
+                  marginUsed,
+                  commission,
+                  totalDeduction,
+                  newBalance: user.balance - totalDeduction
+                });
+                
                 await tx.user.update({
-                  where: { id: marketMaker.id },
+                  where: { id: user.id },
                   data: {
                     balance: {
-                      increment: commission
+                      decrement: totalDeduction
                     }
                   }
                 });
-                console.log('[Orders API] Commission transferred to market maker:', commission);
+
+                // Transfer commission to market maker account
+                const marketMaker = await tx.user.findUnique({
+                  where: { email: 'marketmaker@cs2derivatives.com' }
+                });
+                
+                if (marketMaker) {
+                  await tx.user.update({
+                    where: { id: marketMaker.id },
+                    data: {
+                      balance: {
+                        increment: commission
+                      }
+                    }
+                  });
+                  console.log('[Orders API] Commission transferred to market maker:', commission);
+                }
               }
-            }
-          });
-        },
-        'create position and update balance'
+            });
+          },
+          'create position and update balance'
+        ),
+        20000 // 20 second timeout for transaction
       );
     } else {
       console.log('[Orders API] Order placed but no fills (limit order in order book)');
     }
 
     // Get updated order details
-    const updatedOrder = await PrismaClientSingleton.executeWithRetry(
-      async (prisma) => {
-        return await prisma.order.findUnique({
-          where: { id: result.orderId },
-          include: {
-            skin: true,
-            fills: true
-          }
-        });
-      },
-      'fetch updated order details'
+    const updatedOrder = await withTimeout(
+      PrismaClientSingleton.executeWithRetry(
+        async (prisma) => {
+          return await prisma.order.findUnique({
+            where: { id: result.orderId },
+            include: {
+              skin: true,
+              fills: true
+            }
+          });
+        },
+        'fetch updated order details'
+      ),
+      10000 // 10 second timeout
     );
 
     if (!updatedOrder) {
@@ -440,9 +513,13 @@ export async function POST(request: NextRequest) {
     
     // Return more specific error information
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const isTimeoutError = errorMessage.includes('timed out');
+    
     return NextResponse.json({ 
       error: 'Failed to place order',
-      details: errorMessage
+      details: errorMessage,
+      type: isTimeoutError ? 'timeout' : 'general',
+      suggestion: isTimeoutError ? 'Please try again. The system may be experiencing high load.' : 'Please check your order details and try again.'
     }, { status: 500 });
   }
 } 
