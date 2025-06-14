@@ -88,6 +88,7 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [positions, setPositions] = useState<Position[]>([]);
   const [userOrders, setUserOrders] = useState<Order[]>([]);
+  const [cancellingOrders, setCancellingOrders] = useState<Set<string>>(new Set());
   const [positionLoading, setPositionLoading] = useState(false);
   const [closingOrderIds, setClosingOrderIds] = useState<Set<string>>(new Set());
   const [positionSize, setPositionSize] = useState(1);
@@ -880,20 +881,51 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                           </td>
                           <td className="py-4 px-3 text-right">
                             <button
-                              className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                              className={`px-3 py-1 rounded text-xs transition-colors ${
+                                cancellingOrders.has(order.id)
+                                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                                  : 'bg-red-600 text-white hover:bg-red-700'
+                              }`}
+                              disabled={cancellingOrders.has(order.id)}
                               onClick={async () => {
+                                if (cancellingOrders.has(order.id)) return;
+                                
+                                // Add to cancelling set
+                                setCancellingOrders(prev => new Set(prev).add(order.id));
+                                
                                 try {
+                                  console.log('Cancelling order:', order.id, 'Status:', order.status);
                                   const response = await fetch(`/api/orders/${order.id}`, { method: 'DELETE' });
+                                  const result = await response.json();
+                                  
                                   if (response.ok) {
-                                    fetchUserOrders();
+                                    console.log('Order cancelled successfully:', result);
+                                    // Immediately remove from UI
+                                    setUserOrders(prev => prev.filter(o => o.id !== order.id));
+                                    // Also trigger refresh to ensure consistency
+                                    setTimeout(() => {
+                                      fetchUserOrders();
+                                      fetchPositions();
+                                    }, 1000);
                                     alert('Order cancelled successfully');
+                                  } else {
+                                    console.error('Failed to cancel order:', result);
+                                    alert(`Failed to cancel order: ${result.error || 'Unknown error'}`);
                                   }
                                 } catch (err) {
-                                  alert('Failed to cancel order');
+                                  console.error('Error cancelling order:', err);
+                                  alert('Failed to cancel order: Network error');
+                                } finally {
+                                  // Remove from cancelling set
+                                  setCancellingOrders(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(order.id);
+                                    return newSet;
+                                  });
                                 }
                               }}
                             >
-                              Cancel
+                              {cancellingOrders.has(order.id) ? 'Cancelling...' : 'Cancel'}
                             </button>
                           </td>
                         </tr>
