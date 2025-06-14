@@ -66,7 +66,7 @@ const WearRangeVisualizer = ({ floatValue }: { floatValue: number | null }) => {
       <div className="flex justify-between text-xs mt-1 text-gray-400">
         {wearRanges.map(([wear, range]) => (
           <div key={wear} className="text-center" style={{ width: `${((range.max - range.min) / 1) * 100}%` }}>
-            <p className="truncate">{range.min.toFixed(2)}</p>
+            <p className="truncate">{(range.min || 0).toFixed(2)}</p>
           </div>
         ))}
         <p>1.00</p>
@@ -203,16 +203,26 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
   const getSimpleInsights = (analysis: FloatAnalysisType | null) => {
     if (!analysis) return null;
     const wears = Object.entries(analysis.wearConditions);
-    const prices = wears.map(([_, data]) => data.avgPrice);
+    const prices = wears.map(([_, data]) => data.avgPrice).filter(price => price && !isNaN(price) && price > 0);
+    
+    if (prices.length === 0) {
+      return {
+        bestValue: 'Field-Tested',
+        mostExpensive: 'Factory New',
+        cheapest: 'Battle-Scarred',
+        priceSpread: '0'
+      };
+    }
+    
     const maxPrice = Math.max(...prices);
     const minPrice = Math.min(...prices);
-    const priceSpread = ((maxPrice - minPrice) / minPrice * 100);
+    const priceSpread = minPrice > 0 ? ((maxPrice - minPrice) / minPrice * 100) : 0;
 
     return {
       bestValue: wears.find(([_, data]) => data.avgPrice === Math.min(...prices.filter(p => p > minPrice)))?.[0] || 'Field-Tested',
       mostExpensive: wears.find(([_, data]) => data.avgPrice === maxPrice)?.[0] || 'Factory New',
       cheapest: wears.find(([_, data]) => data.avgPrice === minPrice)?.[0] || 'Battle-Scarred',
-      priceSpread: priceSpread.toFixed(0)
+      priceSpread: (isNaN(priceSpread) || !isFinite(priceSpread)) ? '0' : priceSpread.toFixed(0)
     };
   };
 
@@ -355,9 +365,10 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
                           {isLowest && <span className="text-red-400 text-xs">💰 Budget</span>}
                         </div>
                         <div className="text-right">
-                          <span className="text-white font-semibold">${data.avgPrice.toFixed(2)}</span>
+                          <span className="text-white font-semibold">${(data.avgPrice || 0).toFixed(2)}</span>
                           <div className="text-gray-500">
-                            {insights?.cheapest ? ((data.avgPrice / analysis.wearConditions[insights.cheapest].avgPrice - 1) * 100).toFixed(0) : '0'}% vs cheapest
+                            {insights?.cheapest && analysis.wearConditions[insights.cheapest]?.avgPrice ? 
+                              ((data.avgPrice / analysis.wearConditions[insights.cheapest].avgPrice - 1) * 100).toFixed(0) : '0'}% vs cheapest
                           </div>
                         </div>
                       </div>
@@ -428,7 +439,7 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
                         {priceImpact.wear}
                       </p>
                       <p className="text-xs text-gray-400">
-                        Float Range: {WEAR_RANGES[priceImpact.wear as keyof typeof WEAR_RANGES].min.toFixed(3)} - {WEAR_RANGES[priceImpact.wear as keyof typeof WEAR_RANGES].max.toFixed(3)}
+                        Float Range: {(WEAR_RANGES[priceImpact.wear as keyof typeof WEAR_RANGES]?.min || 0).toFixed(3)} - {(WEAR_RANGES[priceImpact.wear as keyof typeof WEAR_RANGES]?.max || 1).toFixed(3)}
                       </p>
                     </div>
                   </div>
@@ -439,7 +450,7 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
                       {/* Market Price Reference */}
                       <div className="text-center pb-3 border-b border-gray-600">
                         <p className="text-xs text-gray-400 mb-1">Market Price Reference</p>
-                        <p className="text-sm text-white">${priceImpact.marketPrice.toLocaleString()}</p>
+                        <p className="text-sm text-white">${(priceImpact.marketPrice || 0).toLocaleString()}</p>
                       </div>
                       
                       {/* Float Value Effect */}
@@ -447,17 +458,17 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
                         <div className="text-center">
                           <p className="text-xs text-gray-400 mb-1">Price with This Float</p>
                           <p className="text-lg font-bold text-white">
-                            ${priceImpact.estimatedPrice.toLocaleString()}
+                            ${(priceImpact.estimatedPrice || 0).toLocaleString()}
                           </p>
                           <div className={`text-sm mt-1 ${
-                            priceImpact.priceEffect.percentageChange > 0 ? 'text-green-400' :
-                            priceImpact.priceEffect.percentageChange < 0 ? 'text-red-400' :
+                            (priceImpact.priceEffect?.percentageChange || 0) > 0 ? 'text-green-400' :
+                            (priceImpact.priceEffect?.percentageChange || 0) < 0 ? 'text-red-400' :
                             'text-gray-400'
                           }`}>
-                            {formatPriceChange(priceImpact.priceEffect.absoluteChange)}
+                            {formatPriceChange(priceImpact.priceEffect?.absoluteChange || 0)}
                             <span className="text-xs ml-1">
-                              ({priceImpact.priceEffect.percentageChange > 0 ? '+' : ''}
-                              {priceImpact.priceEffect.percentageChange.toFixed(1)}%)
+                              ({(priceImpact.priceEffect?.percentageChange || 0) > 0 ? '+' : ''}
+                              {(priceImpact.priceEffect?.percentageChange || 0).toFixed(1)}%)
                             </span>
                           </div>
                         </div>
@@ -465,13 +476,13 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
                         <div className="text-center border-l border-gray-600">
                           <p className="text-xs text-gray-400 mb-1">Similar Floats</p>
                           <div className="space-y-1">
-                            {priceImpact.priceEffect.similarFloats.map((range, index) => (
+                            {(priceImpact.priceEffect?.similarFloats || []).map((range, index) => (
                               <div key={index} className="text-xs">
                                 <span className="text-gray-400">
-                                  {range.min.toFixed(4)}-{range.max.toFixed(4)}:
+                                  {(range.min || 0).toFixed(4)}-{(range.max || 0).toFixed(4)}:
                                 </span>
                                 <span className="text-white ml-1">
-                                  ${range.avgPrice.toLocaleString()}
+                                  ${(range.avgPrice || 0).toLocaleString()}
                                 </span>
                               </div>
                             ))}
@@ -488,13 +499,13 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
                         <p className="text-xs text-gray-400 mb-1">Float Quality</p>
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${
-                            priceImpact.priceEffect.percentageChange > 20 ? 'bg-green-400' :
-                            priceImpact.priceEffect.percentageChange > 0 ? 'bg-blue-400' :
+                            (priceImpact.priceEffect?.percentageChange || 0) > 20 ? 'bg-green-400' :
+                            (priceImpact.priceEffect?.percentageChange || 0) > 0 ? 'bg-blue-400' :
                             'bg-yellow-400'
                           }`} />
                           <p className="text-sm text-white">
-                            {priceImpact.priceEffect.percentageChange > 20 ? 'Premium Float' :
-                             priceImpact.priceEffect.percentageChange > 0 ? 'Above Average' :
+                            {(priceImpact.priceEffect?.percentageChange || 0) > 20 ? 'Premium Float' :
+                             (priceImpact.priceEffect?.percentageChange || 0) > 0 ? 'Above Average' :
                              'Standard Float'}
                           </p>
                         </div>
@@ -517,11 +528,11 @@ export default function FloatAnalysis({ skinId, skinName }: FloatAnalysisProps) 
                   <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">
                     <span className="text-blue-400">💡</span>
                     <p>
-                      {priceImpact.priceEffect.percentageChange > 30 ? 
+                      {(priceImpact.priceEffect?.percentageChange || 0) > 30 ? 
                         "Exceptional float value - commands significant premium over market price!" :
-                       priceImpact.priceEffect.percentageChange > 10 ?
+                       (priceImpact.priceEffect?.percentageChange || 0) > 10 ?
                         "Good float value - worth more than typical market price." :
-                       priceImpact.priceEffect.percentageChange > 0 ?
+                       (priceImpact.priceEffect?.percentageChange || 0) > 0 ?
                         "Slightly better than market average - small premium possible." :
                         "Standard float value - expect typical market pricing."}
                     </p>
