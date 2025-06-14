@@ -674,25 +674,49 @@ export function getMockOrders(userId: string, skinId?: string, status?: string[]
 
 // Cancel/remove a mock order
 export function cancelMockOrder(orderId: string, userId: string): boolean {
-  const orderIndex = mockOrdersState.findIndex(order => 
-    order.id === orderId && order.userId === userId
-  );
-  
-  if (orderIndex === -1) {
+  try {
+    console.log(`[Mock Data] Attempting to cancel order: ${orderId} for user: ${userId}`);
+    console.log(`[Mock Data] Total orders in state: ${mockOrdersState.length}`);
+    
+    const orderIndex = mockOrdersState.findIndex(order => 
+      order.id === orderId && order.userId === userId
+    );
+    
+    if (orderIndex === -1) {
+      console.log(`[Mock Data] Order not found. Available orders for user ${userId}:`);
+      const userOrders = mockOrdersState.filter(order => order.userId === userId);
+      userOrders.forEach(order => {
+        console.log(`[Mock Data] - Order ID: ${order.id}, Status: ${order.status}, Side: ${order.side}`);
+      });
+      return false;
+    }
+    
+    console.log(`[Mock Data] Found order at index ${orderIndex}:`, {
+      id: mockOrdersState[orderIndex].id,
+      status: mockOrdersState[orderIndex].status,
+      side: mockOrdersState[orderIndex].side
+    });
+    
+    // Update the order status to CANCELLED
+    mockOrdersState[orderIndex].status = 'CANCELLED';
+    mockOrdersState[orderIndex].cancelledAt = new Date().toISOString();
+    
+    // Remove from order book if it was there
+    const order = mockOrdersState[orderIndex];
+    if (order.side === 'BUY') {
+      const beforeCount = mockOrderBookState.bids.length;
+      mockOrderBookState.bids = mockOrderBookState.bids.filter(bid => bid.orderId !== orderId);
+      console.log(`[Mock Data] Removed from bids: ${beforeCount} -> ${mockOrderBookState.bids.length}`);
+    } else {
+      const beforeCount = mockOrderBookState.asks.length;
+      mockOrderBookState.asks = mockOrderBookState.asks.filter(ask => ask.orderId !== orderId);
+      console.log(`[Mock Data] Removed from asks: ${beforeCount} -> ${mockOrderBookState.asks.length}`);
+    }
+    
+    console.log(`[Mock Data] Order ${orderId} cancelled successfully`);
+    return true;
+  } catch (error) {
+    console.error(`[Mock Data] Error cancelling order ${orderId}:`, error);
     return false;
   }
-  
-  // Update the order status to CANCELLED
-  mockOrdersState[orderIndex].status = 'CANCELLED';
-  mockOrdersState[orderIndex].cancelledAt = new Date().toISOString();
-  
-  // Remove from order book if it was there
-  const order = mockOrdersState[orderIndex];
-  if (order.side === 'BUY') {
-    mockOrderBookState.bids = mockOrderBookState.bids.filter(bid => bid.orderId !== orderId);
-  } else {
-    mockOrderBookState.asks = mockOrderBookState.asks.filter(ask => ask.orderId !== orderId);
-  }
-  
-  return true;
 } 
