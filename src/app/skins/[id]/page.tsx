@@ -163,18 +163,18 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
     if (!session?.user?.id) return;
     
     try {
-      const response = await fetch(`/api/orders?skinId=${params.id}&status=OPEN,PENDING,PARTIAL`);
+      const response = await fetch(`/api/orders?status=OPEN,PENDING,PARTIAL`);
       if (!response.ok) {
         throw new Error('Failed to fetch orders');
       }
       const data = await response.json();
-      console.log('Fetched orders for skin:', params.id, data.orders);
+      console.log('Fetched all user orders:', data.orders);
       setUserOrders(data.orders || []);
     } catch (err) {
       console.error('Error fetching orders:', err);
       setUserOrders([]);
     }
-  }, [params.id, session?.user?.id]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     fetchSkinDetails();
@@ -838,7 +838,7 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                               }`}>
                                 {order.positionType}
                               </span>
-                              <span className="text-white font-medium">{skin.name.split(' | ')[0]}</span>
+                                                                    <span className="text-white font-medium">{order.skin?.name?.split(' | ')[0] || 'Unknown'}</span>
                             </div>
                           </td>
                           <td className="py-4 px-3">
