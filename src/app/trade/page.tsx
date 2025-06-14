@@ -60,6 +60,24 @@ interface Position {
   timestamp: string;
 }
 
+interface Order {
+  id: string;
+  userId: string;
+  skinId: string;
+  side: 'BUY' | 'SELL';
+  orderType: 'MARKET' | 'LIMIT';
+  positionType: 'LONG' | 'SHORT';
+  price: number;
+  quantity: number;
+  filledQty: number;
+  remainingQty: number;
+  status: string;
+  createdAt: Date;
+  skin: {
+    name: string;
+  };
+}
+
 const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
 
 export default function TradePage() {
@@ -77,13 +95,14 @@ export default function TradePage() {
     total: 0
   });
   const [positions, setPositions] = useState<Position[]>([]);
+  const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [balance, setBalance] = useState({
     available: 10000,
     margin: 2500,
     total: 12500
   });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'positions' | 'orders'>('positions');
+  const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'conditional'>('positions');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch skins data
@@ -157,6 +176,27 @@ export default function TradePage() {
 
     fetchPositions();
   }, [session, skins]);
+
+  // Fetch user orders from API
+  useEffect(() => {
+    const fetchUserOrders = async () => {
+      if (!session) return;
+      
+      try {
+        const response = await fetch('/api/orders?status=OPEN,PENDING,PARTIAL');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Fetched user orders:', data.orders);
+          setUserOrders(data.orders || []);
+        }
+      } catch (error) {
+        console.error('Error fetching user orders:', error);
+        setUserOrders([]);
+      }
+    };
+
+    fetchUserOrders();
+  }, [session, refreshTrigger]);
 
   const filteredSkins = skins.filter(skin =>
     skin.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -628,6 +668,16 @@ export default function TradePage() {
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
+                  Open Orders
+                </button>
+                <button
+                  onClick={() => setActiveTab('conditional')}
+                  className={`flex-1 px-6 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'conditional'
+                      ? 'text-white border-b-2 border-blue-500 bg-[#23262F]'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
                   Conditional Orders
                 </button>
               </div>
@@ -642,6 +692,109 @@ export default function TradePage() {
                     }}
                     onOrderPlaced={handleOrderPlaced}
                   />
+                ) : activeTab === 'orders' ? (
+                  <div className="h-full overflow-y-auto p-4">
+                    {userOrders.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-600">
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Time</th>
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Symbol</th>
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Type</th>
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Side</th>
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Amount</th>
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Price</th>
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Filled</th>
+                              <th className="text-left py-3 px-2 text-gray-400 font-medium">Status</th>
+                              <th className="text-right py-3 px-2 text-gray-400 font-medium">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userOrders.map((order) => {
+                              const fillPercentage = ((order.quantity - order.remainingQty) / order.quantity) * 100;
+                              
+                              return (
+                                <tr key={order.id} className="border-b border-gray-700/50 hover:bg-[#1A1C23]">
+                                  <td className="py-3 px-2">
+                                    <span className="text-gray-400 text-xs">
+                                      {new Date(order.createdAt).toLocaleTimeString()}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        order.positionType === 'LONG' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                                      }`}>
+                                        {order.positionType}
+                                      </span>
+                                      <span className="text-white font-medium text-xs">{order.skin?.name?.split(' | ')[0] || 'Unknown'}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <span className="text-white font-medium text-xs">{order.orderType}</span>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <span className={`font-medium text-xs ${
+                                      order.side === 'BUY' ? 'text-green-400' : 'text-red-400'
+                                    }`}>
+                                      {order.side}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <span className="text-white font-medium text-xs">{order.quantity}</span>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <span className="text-white font-medium text-xs">${(order.price || 0).toFixed(2)}</span>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-white font-medium text-xs">
+                                      {((order.quantity || 0) - (order.remainingQty || 0)).toFixed(1)}/{order.quantity || 0}
+                                      <div className="text-xs text-gray-400">
+                                        {(fillPercentage || 0).toFixed(1)}%
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      order.status === 'PENDING' ? 'bg-yellow-900/30 text-yellow-400' :
+                                      order.status === 'PARTIAL' ? 'bg-blue-900/30 text-blue-400' :
+                                      order.status === 'FILLED' ? 'bg-green-900/30 text-green-400' :
+                                      'bg-gray-900/30 text-gray-400'
+                                    }`}>
+                                      {order.status}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-2 text-right">
+                                    <button
+                                      className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                                      onClick={async () => {
+                                        try {
+                                          const response = await fetch(`/api/orders/${order.id}`, { method: 'DELETE' });
+                                          if (response.ok) {
+                                            setRefreshTrigger(prev => prev + 1);
+                                            alert('Order cancelled successfully');
+                                          }
+                                        } catch (err) {
+                                          alert('Failed to cancel order');
+                                        }
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-400">No open orders</p>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="h-full overflow-y-auto p-4">
                     <ConditionalOrdersList
