@@ -670,4 +670,29 @@ export function getMockOrders(userId: string, skinId?: string, status?: string[]
   }
   
   return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+// Cancel/remove a mock order
+export function cancelMockOrder(orderId: string, userId: string): boolean {
+  const orderIndex = mockOrdersState.findIndex(order => 
+    order.id === orderId && order.userId === userId
+  );
+  
+  if (orderIndex === -1) {
+    return false;
+  }
+  
+  // Update the order status to CANCELLED
+  mockOrdersState[orderIndex].status = 'CANCELLED';
+  mockOrdersState[orderIndex].cancelledAt = new Date().toISOString();
+  
+  // Remove from order book if it was there
+  const order = mockOrdersState[orderIndex];
+  if (order.side === 'BUY') {
+    mockOrderBookState.bids = mockOrderBookState.bids.filter(bid => bid.orderId !== orderId);
+  } else {
+    mockOrderBookState.asks = mockOrderBookState.asks.filter(ask => ask.orderId !== orderId);
+  }
+  
+  return true;
 } 
