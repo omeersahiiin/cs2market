@@ -34,30 +34,18 @@ export async function DELETE(
       
       const { orderId } = params;
       
-      // For mock data, we need to use the correct user ID format
-      // The session might have a different ID format than the mock user ID
-      let mockUserId = session.user.id;
+      // Use the actual session user ID - no mapping needed
+      const userId = session.user.id;
+      console.log(`[Cancel Order API] Using user ID: ${userId} for session user: ${session.user.email}`);
       
-      // If the session user ID doesn't match mock format, try to map it
-      if (!mockUserId.startsWith('mock-user-')) {
-        // Map email to mock user ID
-        if (session.user.email === 'omeersahiiin8@gmail.com') {
-          mockUserId = 'mock-user-1';
-        } else {
-          mockUserId = 'mock-user-1'; // Default to first mock user for testing
-        }
-      }
-      
-      console.log(`[Cancel Order API] Using mock user ID: ${mockUserId} for session user: ${session.user.email}`);
-      
-      const success = cancelMockOrder(orderId, mockUserId);
+      const success = cancelMockOrder(orderId, userId);
       
       if (!success) {
-        console.log(`[Cancel Order API] Mock order not found: ${orderId} for user: ${mockUserId}`);
+        console.log(`[Cancel Order API] Mock order not found: ${orderId} for user: ${userId}`);
         
         // Let's also check what orders exist for debugging
-        const allOrders = getMockOrders(mockUserId);
-        console.log(`[Cancel Order API] Available orders for user ${mockUserId}:`, allOrders.map(o => ({ id: o.id, status: o.status })));
+        const allOrders = getMockOrders(userId);
+        console.log(`[Cancel Order API] Available orders for user ${userId}:`, allOrders.map(o => ({ id: o.id, status: o.status })));
         
         return NextResponse.json({ error: 'Order not found' }, { status: 404 });
       }
