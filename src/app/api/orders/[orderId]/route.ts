@@ -27,6 +27,7 @@ export async function DELETE(
     }
 
     console.log(`[Cancel Order API] User email: ${session.user.email}`);
+    console.log(`[Cancel Order API] Session user object:`, JSON.stringify(session.user, null, 2));
 
     // Check if we should use mock data
     if (shouldUseMockData()) {
@@ -35,8 +36,13 @@ export async function DELETE(
       const { orderId } = params;
       
       // Use the actual session user ID - no mapping needed
-      const userId = session.user.id;
+      const userId = session.user.id || session.user.email; // Fallback to email if ID not available
       console.log(`[Cancel Order API] Using user ID: ${userId} for session user: ${session.user.email}`);
+      
+      if (!userId) {
+        console.log(`[Cancel Order API] No user ID available in session`);
+        return NextResponse.json({ error: 'User ID not available' }, { status: 400 });
+      }
       
       const success = cancelMockOrder(orderId, userId);
       
