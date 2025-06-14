@@ -619,6 +619,19 @@ export const MOCK_WEAR_ANALYSIS = {
 
 // Function to determine if we should use mock data
 export function shouldUseMockData(): boolean {
+  // TEMPORARY: Force mock mode for testing even in production
+  // TODO: Remove this when database is fully working
+  console.log('[Mock Data] Environment check:', {
+    VERCEL: process.env.VERCEL,
+    NODE_ENV: process.env.NODE_ENV,
+    DATABASE_URL: process.env.DATABASE_URL ? 'configured' : 'missing'
+  });
+  
+  // Force mock mode for now to test functionality
+  return true;
+  
+  // Original logic (commented out for testing):
+  /*
   // In production (Vercel), always use real database
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
     return false;
@@ -632,6 +645,7 @@ export function shouldUseMockData(): boolean {
   
   // Use real database if properly configured, otherwise use mock data
   return !hasValidDatabase;
+  */
 }
 
 // Mock authentication
