@@ -9,6 +9,113 @@ let mockOrderBookState = {
   asks: [] as any[]
 };
 
+// Initialize mock data with some sample orders
+function initializeMockData() {
+  if (mockOrdersState.length === 0) {
+    console.log('[Mock Data] Initializing with sample orders...');
+    
+    // Add some sample orders for different skins
+    const sampleOrders = [
+      // AWP Dragon Lore orders
+      {
+        id: 'mock-order-1',
+        userId: 'sample-user-1',
+        skinId: 'skin-1',
+        side: 'BUY',
+        orderType: 'LIMIT',
+        positionType: 'LONG',
+        price: 7450.00,
+        quantity: 1,
+        filledQty: 0,
+        remainingQty: 1,
+        status: 'OPEN',
+        createdAt: new Date().toISOString(),
+        skin: { name: 'AWP | Dragon Lore' }
+      },
+      {
+        id: 'mock-order-2',
+        userId: 'sample-user-2',
+        skinId: 'skin-1',
+        side: 'SELL',
+        orderType: 'LIMIT',
+        positionType: 'SHORT',
+        price: 7550.00,
+        quantity: 1,
+        filledQty: 0,
+        remainingQty: 1,
+        status: 'OPEN',
+        createdAt: new Date().toISOString(),
+        skin: { name: 'AWP | Dragon Lore' }
+      },
+      // AK-47 Fire Serpent orders
+      {
+        id: 'mock-order-3',
+        userId: 'sample-user-1',
+        skinId: 'skin-2',
+        side: 'BUY',
+        orderType: 'LIMIT',
+        positionType: 'LONG',
+        price: 1240.00,
+        quantity: 2,
+        filledQty: 0,
+        remainingQty: 2,
+        status: 'OPEN',
+        createdAt: new Date().toISOString(),
+        skin: { name: 'AK-47 | Fire Serpent' }
+      },
+      {
+        id: 'mock-order-4',
+        userId: 'sample-user-2',
+        skinId: 'skin-2',
+        side: 'SELL',
+        orderType: 'LIMIT',
+        positionType: 'SHORT',
+        price: 1260.00,
+        quantity: 1,
+        filledQty: 0,
+        remainingQty: 1,
+        status: 'OPEN',
+        createdAt: new Date().toISOString(),
+        skin: { name: 'AK-47 | Fire Serpent' }
+      },
+      // AWP Asiimov orders
+      {
+        id: 'mock-order-5',
+        userId: 'sample-user-1',
+        skinId: 'skin-3',
+        side: 'BUY',
+        orderType: 'LIMIT',
+        positionType: 'LONG',
+        price: 150.00,
+        quantity: 3,
+        filledQty: 0,
+        remainingQty: 3,
+        status: 'OPEN',
+        createdAt: new Date().toISOString(),
+        skin: { name: 'AWP | Asiimov' }
+      },
+      {
+        id: 'mock-order-6',
+        userId: 'sample-user-2',
+        skinId: 'skin-3',
+        side: 'SELL',
+        orderType: 'LIMIT',
+        positionType: 'SHORT',
+        price: 152.00,
+        quantity: 2,
+        filledQty: 0,
+        remainingQty: 2,
+        status: 'OPEN',
+        createdAt: new Date().toISOString(),
+        skin: { name: 'AWP | Asiimov' }
+      }
+    ];
+    
+    mockOrdersState.push(...sampleOrders);
+    console.log(`[Mock Data] Added ${sampleOrders.length} sample orders`);
+  }
+}
+
 // Reset mock order book to only show real orders
 export function resetMockOrderBook() {
   mockOrderBookState = {
@@ -576,6 +683,9 @@ function updateMockOrderBook(skinId: string) {
 
 // Get current mock order book
 export function getMockOrderBook(skinId: string) {
+  // Initialize mock data if empty
+  initializeMockData();
+  
   // Always update with real orders only
   updateMockOrderBook(skinId);
   return mockOrderBookState;
@@ -673,6 +783,9 @@ export function getMockPositions(userId: string) {
 
 // Get user orders
 export function getMockOrders(userId: string, skinId?: string, status?: string[]) {
+  // Initialize mock data if empty
+  initializeMockData();
+  
   let orders = mockOrdersState.filter(order => order.userId === userId);
   
   if (skinId) {
