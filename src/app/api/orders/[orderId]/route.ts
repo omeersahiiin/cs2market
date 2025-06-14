@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { PrismaClient } from '@prisma/client';
 import OrderMatchingEngine from '@/lib/orderMatchingEngine';
-
-const prisma = new PrismaClient();
+import { PrismaClientSingleton } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +17,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Since database tables exist and this worked before, skip mock data check
-    // and go straight to real database
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
+    const user = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.user.findUnique({
+          where: { email: session.user.email }
+        });
+      },
+      'fetch user for cancel order'
+    );
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -33,12 +33,17 @@ export async function DELETE(
     const { orderId } = params;
 
     // Get the order to find the skinId
-    const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        userId: user.id
-      }
-    });
+    const order = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.order.findFirst({
+          where: {
+            id: orderId,
+            userId: user.id
+          }
+        });
+      },
+      'fetch order for cancellation'
+    );
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
@@ -55,13 +60,18 @@ export async function DELETE(
     }
 
     // Get updated order
-    const updatedOrder = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        skin: true,
-        fills: true
-      }
-    });
+    const updatedOrder = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.order.findUnique({
+          where: { id: orderId },
+          include: {
+            skin: true,
+            fills: true
+          }
+        });
+      },
+      'fetch updated order after cancellation'
+    );
 
     return NextResponse.json({ order: updatedOrder });
 
@@ -84,9 +94,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
+    const user = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.user.findUnique({
+          where: { email: session.user.email }
+        });
+      },
+      'fetch user for get order'
+    );
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -94,16 +109,21 @@ export async function GET(
 
     const { orderId } = params;
 
-    const order = await prisma.order.findFirst({
-      where: {
-        id: orderId,
-        userId: user.id
+    const order = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.order.findFirst({
+          where: {
+            id: orderId,
+            userId: user.id
+          },
+          include: {
+            skin: true,
+            fills: true
+          }
+        });
       },
-      include: {
-        skin: true,
-        fills: true
-      }
-    });
+      'fetch order details'
+    );
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
