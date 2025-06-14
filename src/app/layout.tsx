@@ -22,14 +22,14 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} bg-[#0F1419] text-white`}>
         <ErrorBoundary>
-          <AuthProvider>
-            <SystemInitializer />
-            <div className="min-h-screen flex flex-col">
-              <Navbar />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </div>
-          </AuthProvider>
+        <AuthProvider>
+          <SystemInitializer />
+          <div className="min-h-screen flex flex-col">
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+        </AuthProvider>
         </ErrorBoundary>
       </body>
     </html>

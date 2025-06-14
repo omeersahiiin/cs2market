@@ -47,7 +47,7 @@ export default function PositionManager({
     });
   };
 
-  const formatPrice = (price: number) => price.toFixed(2);
+  const formatPrice = (price: number) => (price || 0).toFixed(2);
 
   const handleStopLoss = (position: Position) => {
     setSelectedPosition(position);
@@ -167,7 +167,7 @@ export default function PositionManager({
                       }`}>
                         {position.pnl >= 0 ? '+' : ''}${formatPrice(position.pnl)}
                         <span className="ml-2 text-sm">
-                          ({position.pnl >= 0 ? '+' : ''}{position.pnlPercent.toFixed(2)}%)
+                          ({(position.pnl || 0) >= 0 ? '+' : ''}{(position.pnlPercent || 0).toFixed(2)}%)
                         </span>
                       </div>
                     </div>
@@ -190,7 +190,7 @@ export default function PositionManager({
               <div>
                 <div className="text-gray-400">Total Margin</div>
                 <div className="text-white font-semibold">
-                  ${positions.reduce((sum, pos) => sum + pos.margin, 0).toFixed(2)}
+                  ${positions.reduce((sum, pos) => sum + (pos.margin || 0), 0).toFixed(2)}
                 </div>
               </div>
               <div>
@@ -201,7 +201,7 @@ export default function PositionManager({
                     : 'text-red-400'
                 }`}>
                   {positions.reduce((sum, pos) => sum + pos.pnl, 0) >= 0 ? '+' : ''}
-                  ${positions.reduce((sum, pos) => sum + pos.pnl, 0).toFixed(2)}
+                  ${positions.reduce((sum, pos) => sum + (pos.pnl || 0), 0).toFixed(2)}
                 </div>
               </div>
             </div>

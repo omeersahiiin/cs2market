@@ -140,9 +140,9 @@ export default function PriceChart({ skinId, currentPrice, selectedWear, classNa
           )}
         </div>
         <div className="text-right">
-          <div className="text-white font-bold">${currentPrice.toFixed(2)}</div>
+                        <div className="text-white font-bold">${(currentPrice || 0).toFixed(2)}</div>
           <div className={`text-sm ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)} ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+                          {(priceChange || 0) >= 0 ? '+' : ''}${(priceChange || 0).toFixed(2)} ({(priceChangePercent || 0) >= 0 ? '+' : ''}{(priceChangePercent || 0).toFixed(2)}%)
           </div>
         </div>
       </div>
@@ -175,10 +175,10 @@ export default function PriceChart({ skinId, currentPrice, selectedWear, classNa
           
           {/* Price labels */}
           <text x={padding} y={padding - 5} fill="#9CA3AF" fontSize="12" textAnchor="start">
-            ${maxPrice.toFixed(2)}
+                            ${(maxPrice || 0).toFixed(2)}
           </text>
           <text x={padding} y={chartHeight - padding + 15} fill="#9CA3AF" fontSize="12" textAnchor="start">
-            ${minPrice.toFixed(2)}
+                            ${(minPrice || 0).toFixed(2)}
           </text>
           
           {/* Time labels */}

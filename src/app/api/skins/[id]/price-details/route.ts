@@ -135,7 +135,7 @@ export async function GET(
             }),
             3000 // 3 second timeout for database update
           );
-          console.log(`[Price Details API] Updated ${skin.name} price: $${currentPrice.toFixed(2)} → $${averageMarketPrice.toFixed(2)} (${priceInfo.confidence}% confidence)`);
+          console.log(`[Price Details API] Updated ${skin.name} price: $${(currentPrice || 0).toFixed(2)} → $${(averageMarketPrice || 0).toFixed(2)} (${priceInfo.confidence}% confidence)`);
         } catch (updateError) {
           console.warn('[Price Details API] Failed to update skin price in database:', updateError);
           // Continue with the response even if update fails

@@ -207,7 +207,7 @@ export default function HomePage() {
               </div>
               <div className="text-center">
                 <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">
-                  ${marketStats?.avgPrice.toFixed(0) || 0}
+                  ${marketStats?.avgPrice ? marketStats.avgPrice.toFixed(0) : '0'}
                 </div>
                 <div className="text-gray-400 font-medium">Average Price</div>
               </div>

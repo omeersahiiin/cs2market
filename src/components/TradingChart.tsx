@@ -45,20 +45,20 @@ const ProfessionalTooltip = ({ active, payload, label, chartType, formatTime }: 
           <div className="space-y-1 text-sm">
             <div className="flex justify-between items-center space-x-6">
               <span className="text-[#787b86]">O</span>
-              <span className="text-[#d1d4dc] font-mono">{data.open.toFixed(2)}</span>
+                              <span className="text-[#d1d4dc] font-mono">{(data.open || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center space-x-6">
               <span className="text-[#787b86]">H</span>
-              <span className="text-[#d1d4dc] font-mono">{data.high.toFixed(2)}</span>
+                              <span className="text-[#d1d4dc] font-mono">{(data.high || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center space-x-6">
               <span className="text-[#787b86]">L</span>
-              <span className="text-[#d1d4dc] font-mono">{data.low.toFixed(2)}</span>
+                              <span className="text-[#d1d4dc] font-mono">{(data.low || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center space-x-6">
               <span className="text-[#787b86]">C</span>
               <span className={`font-mono ${change >= 0 ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
-                {data.close.toFixed(2)}
+                                  {(data.close || 0).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between items-center space-x-6">
@@ -68,7 +68,7 @@ const ProfessionalTooltip = ({ active, payload, label, chartType, formatTime }: 
             <div className="flex justify-between items-center space-x-6 pt-1 border-t border-[#363a45]">
               <span className="text-[#787b86]">Change</span>
               <span className={`font-mono ${change >= 0 ? 'text-[#26a69a]' : 'text-[#ef5350]'}`}>
-                {change >= 0 ? '+' : ''}{change.toFixed(2)} ({changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%)
+                {(change || 0) >= 0 ? '+' : ''}{(change || 0).toFixed(2)} ({(changePercent || 0) >= 0 ? '+' : ''}{(changePercent || 0).toFixed(2)}%)
               </span>
             </div>
           </div>
@@ -76,7 +76,7 @@ const ProfessionalTooltip = ({ active, payload, label, chartType, formatTime }: 
           <div className="space-y-1 text-sm">
             <div className="flex justify-between items-center space-x-6">
               <span className="text-[#787b86]">Price</span>
-              <span className="text-[#d1d4dc] font-mono">{data.close.toFixed(2)}</span>
+                              <span className="text-[#d1d4dc] font-mono">{(data.close || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center space-x-6">
               <span className="text-[#787b86]">Volume</span>
@@ -433,7 +433,7 @@ export default function TradingChart({ skinId, timeframe, currentPrice }: Tradin
                 domain={['dataMin - 1', 'dataMax + 1']}
                 stroke="#787b86"
                 fontSize={11}
-                tickFormatter={(value) => `${value.toFixed(2)}`}
+                tickFormatter={(value) => `${(value || 0).toFixed(2)}`}
                 tickLine={false}
                 axisLine={false}
                 orientation="right"

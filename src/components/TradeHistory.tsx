@@ -76,7 +76,7 @@ export default function TradeHistory({ skinId }: TradeHistoryProps) {
     });
   };
 
-  const formatPrice = (price: number) => price.toFixed(2);
+  const formatPrice = (price: number) => (price || 0).toFixed(2);
 
   if (loading) {
     return (
@@ -130,7 +130,7 @@ export default function TradeHistory({ skinId }: TradeHistoryProps) {
                 {trade.quantity}
               </div>
               <div className="text-center text-gray-300 font-mono">
-                {trade.total.toFixed(2)}
+                                      {(trade.total || 0).toFixed(2)}
               </div>
               <div className="text-right text-gray-400 text-xs">
                 {formatTime(trade.timestamp)}
@@ -158,7 +158,7 @@ export default function TradeHistory({ skinId }: TradeHistoryProps) {
           <div>
             <div className="text-gray-400">Avg Price</div>
             <div className="text-white font-semibold">
-              ${(trades.reduce((sum, trade) => sum + trade.price, 0) / trades.length).toFixed(2)}
+                              ${trades.length > 0 ? ((trades.reduce((sum, trade) => sum + (trade.price || 0), 0) / trades.length) || 0).toFixed(2) : '0.00'}
             </div>
           </div>
         </div>

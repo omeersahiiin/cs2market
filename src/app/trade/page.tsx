@@ -339,8 +339,8 @@ export default function TradePage() {
                     <span className={`font-semibold ${
                       selectedSkin.priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400'
                     }`}>
-                      {selectedSkin.priceChangePercent >= 0 ? '+' : ''}
-                      {selectedSkin.priceChangePercent.toFixed(2)}%
+                      {(selectedSkin.priceChangePercent || 0) >= 0 ? '+' : ''}
+                      {(selectedSkin.priceChangePercent || 0).toFixed(2)}%
                     </span>
                   </div>
                   <div>
@@ -349,11 +349,11 @@ export default function TradePage() {
                   </div>
                   <div>
                     <span className="text-gray-400">24h High: </span>
-                    <span className="font-semibold">${selectedSkin.high24h.toFixed(2)}</span>
+                    <span className="font-semibold">${(selectedSkin.high24h || 0).toFixed(2)}</span>
                   </div>
                   <div>
                     <span className="text-gray-400">24h Low: </span>
-                    <span className="font-semibold">${selectedSkin.low24h.toFixed(2)}</span>
+                    <span className="font-semibold">${(selectedSkin.low24h || 0).toFixed(2)}</span>
                   </div>
                 </div>
               </>
@@ -420,11 +420,11 @@ export default function TradePage() {
                           ${skin.price.toLocaleString()}
                         </div>
                         <div className={`text-base font-semibold px-2 py-1 rounded ${
-                          skin.priceChangePercent >= 0 
+                          (skin.priceChangePercent || 0) >= 0 
                             ? 'text-green-400 bg-green-900/20' 
                             : 'text-red-400 bg-red-900/20'
                         }`}>
-                          {skin.priceChangePercent >= 0 ? '+' : ''}{skin.priceChangePercent.toFixed(2)}%
+                          {(skin.priceChangePercent || 0) >= 0 ? '+' : ''}{(skin.priceChangePercent || 0).toFixed(2)}%
                         </div>
                       </div>
                     </div>

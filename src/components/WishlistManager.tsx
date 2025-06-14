@@ -366,7 +366,7 @@ export default function WishlistManager({ isOpen, onClose }: WishlistManagerProp
                             <div className={`text-sm font-medium ${
                               item.priceChange24h > 0 ? 'text-green-400' : 'text-red-400'
                             }`}>
-                              {item.priceChange24h > 0 ? '+' : ''}{item.priceChange24h.toFixed(1)}%
+                              {(item.priceChange24h || 0) > 0 ? '+' : ''}{(item.priceChange24h || 0).toFixed(1)}%
                             </div>
                           )}
                         </div>

@@ -347,7 +347,7 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ 
         error: 'Insufficient balance for margin requirement',
-        details: `Required: $${requiredMargin.toFixed(2)}, Available: $${user.balance.toFixed(2)}`,
+        details: `Required: $${(requiredMargin || 0).toFixed(2)}, Available: $${(user.balance || 0).toFixed(2)}`,
         required: requiredMargin,
         available: user.balance
       }, { status: 400 });

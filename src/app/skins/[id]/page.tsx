@@ -431,7 +431,7 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                   <div>
                     <p className="text-gray-400 text-lg">Trading Price</p>
                     <p className="font-semibold text-blue-400 text-3xl">
-                      ${currentPrice.toFixed(2)}
+                      ${(currentPrice || 0).toFixed(2)}
                     </p>
                     <p className="text-base text-gray-500">Average across all wears</p>
                   </div>
@@ -449,7 +449,7 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                   <h4 className="font-medium mb-4 text-green-400 text-lg">Unified Market Price</h4>
                   <div className="text-center">
                     <p className="text-4xl font-bold text-green-400">
-                      ${priceDetails.tradingPrice.averageMarketPrice.toFixed(2)}
+                      ${(priceDetails.tradingPrice.averageMarketPrice || 0).toFixed(2)}
                     </p>
                     <p className="text-base text-gray-400 mt-3">Average across all wear conditions</p>
                     <p className="text-sm text-gray-500 mt-2">
@@ -563,15 +563,15 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                       <p className="text-xs text-gray-400">Lowest</p>
-                      <p className="text-sm font-semibold text-red-400">${priceDetails.wearAnalysis.priceRange.lowest.toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-red-400">${(priceDetails.wearAnalysis.priceRange.lowest || 0).toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Spread</p>
-                      <p className="text-sm font-semibold text-yellow-400">{priceDetails.wearAnalysis.priceRange.spread.toFixed(1)}%</p>
+                      <p className="text-sm font-semibold text-yellow-400">{(priceDetails.wearAnalysis.priceRange.spread || 0).toFixed(1)}%</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Highest</p>
-                      <p className="text-sm font-semibold text-green-400">${priceDetails.wearAnalysis.priceRange.highest.toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-green-400">${(priceDetails.wearAnalysis.priceRange.highest || 0).toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -709,21 +709,21 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                               </div>
                             </td>
                             <td className="py-4 px-3">
-                              <span className="text-white font-medium text-base">${position.entryPrice.toFixed(2)}</span>
+                              <span className="text-white font-medium text-base">${(position.entryPrice || 0).toFixed(2)}</span>
                             </td>
                             <td className="py-4 px-3">
-                              <span className="text-white font-medium text-base">${priceForPnL.toFixed(2)}</span>
+                              <span className="text-white font-medium text-base">${(priceForPnL || 0).toFixed(2)}</span>
                             </td>
                             <td className="py-4 px-3">
-                              <div className={`font-medium text-base ${positionPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                ${positionPnL.toFixed(2)}
+                              <div className={`font-medium text-base ${(positionPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                ${(positionPnL || 0).toFixed(2)}
                                 <div className="text-sm">
-                                  ({roe >= 0 ? '+' : ''}{roe.toFixed(2)}%)
+                                  ({(roe || 0) >= 0 ? '+' : ''}{(roe || 0).toFixed(2)}%)
                                 </div>
                               </div>
                             </td>
                             <td className="py-4 px-3">
-                              <span className="text-white font-medium text-base">${position.margin.toFixed(2)}</span>
+                              <span className="text-white font-medium text-base">${(position.margin || 0).toFixed(2)}</span>
                             </td>
                             <td className="py-4 px-3 text-right">
                               <div className="flex justify-end space-x-3">
@@ -767,7 +767,7 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                                     <button
                                       className="px-4 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 disabled:opacity-50 font-medium"
                                       onClick={() => {
-                                        const price = prompt(`Enter limit price (current: $${currentPrice.toFixed(2)}):`);
+                                        const price = prompt(`Enter limit price (current: $${(currentPrice || 0).toFixed(2)}):`);
                                         if (price && parseFloat(price) > 0) {
                                           handleClosePosition(position.id, 'LIMIT', parseFloat(price));
                                         }
@@ -791,8 +791,8 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                 <div className="mt-6 p-4 bg-[#1A1C23] rounded-lg border border-gray-600">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400 text-lg">Total Unrealized PNL:</span>
-                    <span className={`font-bold text-xl ${totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      ${totalPnL.toFixed(2)}
+                    <span className={`font-bold text-xl ${(totalPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      ${(totalPnL || 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -858,13 +858,13 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                             <span className="text-white font-medium">{order.quantity}</span>
                           </td>
                           <td className="py-4 px-3">
-                            <span className="text-white font-medium">${order.price.toFixed(2)}</span>
+                            <span className="text-white font-medium">${(order.price || 0).toFixed(2)}</span>
                           </td>
                           <td className="py-4 px-3">
                             <div className="text-white font-medium">
-                              {(order.quantity - order.remainingQty).toFixed(1)}/{order.quantity}
+                              {((order.quantity || 0) - (order.remainingQty || 0)).toFixed(1)}/{order.quantity || 0}
                               <div className="text-xs text-gray-400">
-                                {fillPercentage.toFixed(1)}%
+                                {(fillPercentage || 0).toFixed(1)}%
                               </div>
                             </div>
                           </td>

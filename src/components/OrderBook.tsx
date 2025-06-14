@@ -217,7 +217,7 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
     }
   };
 
-  const formatPrice = (price: number) => price.toFixed(2);
+  const formatPrice = (price: number) => (price || 0).toFixed(2);
   const formatQuantity = (quantity: number) => quantity.toString();
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -356,8 +356,8 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
           <div className="flex items-center justify-between text-sm">
             <div>
               <span className="text-gray-400">Spread: </span>
-              <span className="text-white">${spread.toFixed(2)}</span>
-              <span className="text-gray-400 ml-2">({spreadPercent.toFixed(3)}%)</span>
+              <span className="text-white">${(spread || 0).toFixed(2)}</span>
+              <span className="text-gray-400 ml-2">({(spreadPercent || 0).toFixed(3)}%)</span>
             </div>
           </div>
         )}
@@ -426,7 +426,7 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
                       >
                         <div className="text-green-400 font-mono text-left">{formatPrice(bid.price)}</div>
                         <div className="text-center text-white font-mono">{formatQuantity(bid.quantity)}</div>
-                        <div className="text-right text-gray-300 font-mono">{bid.total.toFixed(2)}</div>
+                        <div className="text-right text-gray-300 font-mono">{(bid.total || 0).toFixed(2)}</div>
                         
                         {/* Background bar showing relative volume */}
                         <div 
@@ -449,7 +449,7 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
                       >
                         <div className="text-red-400 font-mono text-left">{formatPrice(ask.price)}</div>
                         <div className="text-center text-white font-mono">{formatQuantity(ask.quantity)}</div>
-                        <div className="text-right text-gray-300 font-mono">{ask.total.toFixed(2)}</div>
+                        <div className="text-right text-gray-300 font-mono">{(ask.total || 0).toFixed(2)}</div>
                         
                         {/* Background bar showing relative volume */}
                         <div 
@@ -500,7 +500,7 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
                 <div>
                   <div className="text-xs text-gray-400 mb-1">Avg Price</div>
                   <div className="text-white font-semibold text-sm">
-                    ${trades.length > 0 ? (trades.reduce((sum, trade) => sum + trade.price, 0) / trades.length).toFixed(2) : '0.00'}
+                    ${trades.length > 0 ? ((trades.reduce((sum, trade) => sum + (trade.price || 0), 0) / trades.length) || 0).toFixed(2) : '0.00'}
                   </div>
                 </div>
               </div>
@@ -533,7 +533,7 @@ export default function OrderBook({ skinId, currentPrice = 0, onOrderPlace, onMa
                       {trade.quantity}
                     </div>
                     <div className="text-center text-gray-300 font-mono">
-                      {trade.total.toFixed(2)}
+                      {(trade.total || 0).toFixed(2)}
                     </div>
                     <div className="text-right text-gray-400 text-xs">
                       {formatTime(trade.timestamp)}
