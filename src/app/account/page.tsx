@@ -15,10 +15,11 @@ interface UserStats {
 
 interface Transaction {
   id: string;
-  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRADE' | 'FEE';
+  type: 'TRADE' | 'POSITION_OPEN' | 'POSITION_CLOSE' | 'FEE' | 'DEPOSIT';
   amount: number;
   description: string;
   createdAt: string;
+  skinName?: string;
 }
 
 export default function AccountPage() {
@@ -52,43 +53,45 @@ export default function AccountPage() {
         setBalance(balanceData.balance);
       }
 
-      // Fetch user stats (mock data for now)
-      setStats({
-        totalTrades: 47,
-        totalVolume: 125000,
-        totalPnL: 2350.75,
-        winRate: 68.5,
-        openPositions: 3,
-        openOrders: 5
-      });
+      // Fetch real user stats
+      const statsRes = await fetch('/api/user/stats');
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      } else {
+        // Fallback to default stats if API fails
+        setStats({
+          totalTrades: 0,
+          totalVolume: 0,
+          totalPnL: 0,
+          winRate: 0,
+          openPositions: 0,
+          openOrders: 0
+        });
+      }
 
-      // Fetch transactions (mock data for now)
-      setTransactions([
-        {
-          id: '1',
-          type: 'DEPOSIT',
-          amount: 10000,
-          description: 'Initial deposit',
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: '2',
-          type: 'TRADE',
-          amount: 250.50,
-          description: 'AK-47 Fire Serpent LONG position profit',
-          createdAt: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          id: '3',
-          type: 'FEE',
-          amount: -5.25,
-          description: 'Trading fee',
-          createdAt: new Date(Date.now() - 172800000).toISOString()
-        }
-      ]);
+      // Fetch real transaction history
+      const transactionsRes = await fetch('/api/user/transactions');
+      if (transactionsRes.ok) {
+        const transactionsData = await transactionsRes.json();
+        setTransactions(transactionsData.transactions || []);
+      } else {
+        // Fallback to empty transactions if API fails
+        setTransactions([]);
+      }
 
     } catch (error) {
       console.error('Error fetching account data:', error);
+      // Set fallback data on error
+      setStats({
+        totalTrades: 0,
+        totalVolume: 0,
+        totalPnL: 0,
+        winRate: 0,
+        openPositions: 0,
+        openOrders: 0
+      });
+      setTransactions([]);
     } finally {
       setIsLoading(false);
     }
@@ -239,8 +242,9 @@ export default function AccountPage() {
                     <div className="flex items-center space-x-3">
                       <div className={`w-2 h-2 rounded-full ${
                         transaction.type === 'DEPOSIT' ? 'bg-green-400' :
-                        transaction.type === 'WITHDRAWAL' ? 'bg-red-400' :
+                        transaction.type === 'POSITION_CLOSE' ? 'bg-red-400' :
                         transaction.type === 'TRADE' ? 'bg-blue-400' :
+                        transaction.type === 'POSITION_OPEN' ? 'bg-yellow-400' :
                         'bg-gray-400'
                       }`} />
                       <div>
@@ -280,8 +284,10 @@ export default function AccountPage() {
                       <td className="py-3 px-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           transaction.type === 'DEPOSIT' ? 'bg-green-900/30 text-green-400' :
-                          transaction.type === 'WITHDRAWAL' ? 'bg-red-900/30 text-red-400' :
+                          transaction.type === 'POSITION_CLOSE' ? 'bg-red-900/30 text-red-400' :
                           transaction.type === 'TRADE' ? 'bg-blue-900/30 text-blue-400' :
+                          transaction.type === 'POSITION_OPEN' ? 'bg-yellow-900/30 text-yellow-400' :
+                          transaction.type === 'FEE' ? 'bg-orange-900/30 text-orange-400' :
                           'bg-gray-900/30 text-gray-400'
                         }`}>
                           {transaction.type}
