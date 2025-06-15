@@ -22,19 +22,26 @@ interface WalletBalance {
   locked: string;
 }
 
+// Multiple Binance endpoints to try
+const BINANCE_ENDPOINTS = [
+  'https://api.binance.com',
+  'https://api1.binance.com', 
+  'https://api2.binance.com',
+  'https://api3.binance.com',
+  'https://api.binance.cc', // Alternative domain
+  'https://api.binance.vision' // Another alternative
+];
+
 export class BinanceAPI {
   private baseUrl = 'https://api.binance.com';
-  private fallbackUrl = 'https://api.binance.us'; // Binance US for restricted regions
+  private workingEndpoint: string | null = null;
 
   // Get config dynamically to ensure environment variables are loaded
   private getConfig(): BinanceConfig {
-    // Try Binance US if specified in environment or if main Binance is restricted
-    const useBinanceUS = process.env.USE_BINANCE_US === 'true' || process.env.BINANCE_REGION === 'US';
-    
     return {
       apiKey: process.env.BINANCE_API_KEY || '',
       secretKey: process.env.BINANCE_SECRET_KEY || '',
-      baseUrl: useBinanceUS ? this.fallbackUrl : this.baseUrl
+      baseUrl: this.workingEndpoint || this.baseUrl
     };
   }
 
@@ -45,12 +52,67 @@ export class BinanceAPI {
       .digest('hex');
   }
 
+  // Test all available Binance endpoints to find a working one
+  private async findWorkingEndpoint(): Promise<string | null> {
+    const config = this.getConfig();
+    
+    if (!config.apiKey || !config.secretKey) {
+      console.error('❌ Binance API credentials not found');
+      return null;
+    }
+
+    console.log('🔍 Testing multiple Binance endpoints for Turkey...');
+
+    for (const endpoint of BINANCE_ENDPOINTS) {
+      try {
+        console.log(`🧪 Testing endpoint: ${endpoint}`);
+        
+        const timestamp = Date.now();
+        const queryString = `timestamp=${timestamp}`;
+        const signature = this.createSignature(queryString, config.secretKey);
+        const testUrl = `${endpoint}/api/v3/account?${queryString}&signature=${signature}`;
+        
+        const response = await fetch(testUrl, {
+          headers: {
+            'X-MBX-APIKEY': config.apiKey,
+            'Content-Type': 'application/json'
+          },
+          // Add timeout to avoid hanging
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        });
+
+        if (response.ok) {
+          console.log(`✅ Found working endpoint: ${endpoint}`);
+          this.workingEndpoint = endpoint;
+          this.baseUrl = endpoint;
+          return endpoint;
+        } else {
+          console.log(`❌ Endpoint ${endpoint} failed with status:`, response.status);
+        }
+      } catch (error) {
+        console.log(`❌ Endpoint ${endpoint} failed with error:`, error instanceof Error ? error.message : 'Unknown error');
+        continue;
+      }
+    }
+
+    console.error('❌ No working Binance endpoints found');
+    return null;
+  }
+
   private async makeRequest(endpoint: string, params: Record<string, any> = {}): Promise<any> {
     const config = this.getConfig();
     
     // Check if credentials are available
     if (!config.apiKey || !config.secretKey) {
       throw new Error('Binance API credentials not configured');
+    }
+
+    // If no working endpoint found yet, try to find one
+    if (!this.workingEndpoint) {
+      const workingUrl = await this.findWorkingEndpoint();
+      if (!workingUrl) {
+        throw new Error('No accessible Binance endpoints found from your location');
+      }
     }
 
     const timestamp = Date.now();
@@ -136,16 +198,14 @@ export class BinanceAPI {
     return allDeposits.filter(deposit => deposit.status === 1);
   }
 
-  // Validate API credentials with detailed debugging and fallback support
+  // Enhanced validation with multiple endpoint testing
   async validateCredentials(): Promise<boolean> {
     const config = this.getConfig();
     
     // Enhanced debugging for production
-    console.log('🔍 Binance API Validation Debug:');
+    console.log('🔍 Binance API Validation for Turkey:');
     console.log('- Environment:', process.env.NODE_ENV);
     console.log('- Vercel Environment:', process.env.VERCEL_ENV);
-    console.log('- Using Binance US:', config.baseUrl.includes('binance.us'));
-    console.log('- API Base URL:', config.baseUrl);
     console.log('- API Key exists:', !!config.apiKey);
     console.log('- Secret Key exists:', !!config.secretKey);
     
@@ -174,82 +234,17 @@ export class BinanceAPI {
       return false;
     }
 
-    // Try main API first, then fallback if restricted
-    const urlsToTry = [
-      { url: this.baseUrl, name: 'Binance Global' },
-      { url: this.fallbackUrl, name: 'Binance US' }
-    ];
-
-    for (const { url, name } of urlsToTry) {
-      try {
-        console.log(`🚀 Testing ${name} API (${url})...`);
-        
-        const timestamp = Date.now();
-        const queryString = `timestamp=${timestamp}`;
-        const signature = this.createSignature(queryString, config.secretKey);
-        const testUrl = `${url}/api/v3/account?${queryString}&signature=${signature}`;
-        
-        console.log('- Request URL:', url + '/api/v3/account');
-        console.log('- Timestamp:', timestamp);
-        console.log('- Signature length:', signature.length);
-        
-        const response = await fetch(testUrl, {
-          headers: {
-            'X-MBX-APIKEY': config.apiKey,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        console.log('- Response status:', response.status);
-        console.log('- Response headers:', Object.fromEntries(response.headers.entries()));
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`✅ ${name} API credentials validation successful`);
-          console.log('- Account type:', data.accountType);
-          console.log('- Can trade:', data.canTrade);
-          console.log('- Permissions:', data.permissions);
-          
-          // Update base URL for future requests if using fallback
-          if (url !== this.baseUrl) {
-            console.log(`🔄 Switching to ${name} for future requests`);
-            this.baseUrl = url;
-          }
-          
-          return true;
-        } else {
-          const errorText = await response.text();
-          console.error(`❌ ${name} API validation failed`);
-          console.error('- Status:', response.status);
-          console.error('- Error:', errorText);
-          
-          try {
-            const errorData = JSON.parse(errorText);
-            console.error('- Error code:', errorData.code);
-            console.error('- Error message:', errorData.msg);
-            
-            // If it's a geographic restriction (451), try the next URL
-            if (response.status === 451) {
-              console.log(`🌍 Geographic restriction detected for ${name}, trying next option...`);
-              continue;
-            }
-          } catch (e) {
-            console.error('- Could not parse error response');
-          }
-          
-          // If it's not a geographic issue, don't try other URLs
-          if (response.status !== 451) {
-            break;
-          }
-        }
-      } catch (error) {
-        console.error(`❌ ${name} API validation failed with exception:`, error);
-        continue;
-      }
+    // Try to find a working endpoint
+    const workingEndpoint = await this.findWorkingEndpoint();
+    
+    if (workingEndpoint) {
+      console.log('✅ Binance API validation successful using:', workingEndpoint);
+      return true;
+    } else {
+      console.error('❌ All Binance endpoints are blocked from your location');
+      console.log('💡 Consider using a VPN or proxy server');
+      return false;
     }
-
-    console.error('❌ All Binance API endpoints failed validation');
-    return false;
   }
 }
 
