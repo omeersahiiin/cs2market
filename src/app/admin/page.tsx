@@ -1,156 +1,272 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
-interface MarketMaker {
-  id: string;
-  username: string;
-  email: string;
-  balance: number;
-  createdAt: string;
+interface ApiResponse {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  details?: any;
+  status?: string;
+  [key: string]: any;
 }
 
 export default function AdminPage() {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const [marketMaker, setMarketMaker] = useState<MarketMaker | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [migrationResult, setMigrationResult] = useState<ApiResponse | null>(null);
+  const [monitoringStatus, setMonitoringStatus] = useState<ApiResponse | null>(null);
+  const [binanceStatus, setBinanceStatus] = useState<ApiResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Simple admin check - only allow specific admin emails
-  const isAdmin = session?.user?.email === 'omeersahiiin8@gmail.com';
-
-  useEffect(() => {
-    if (!session) {
-      router.push('/auth/signin');
-      return;
-    }
-
-    if (!isAdmin) {
-      router.push('/');
-      return;
-    }
-
-    fetchMarketMakerBalance();
-  }, [session, isAdmin, router]);
-
-  const fetchMarketMakerBalance = async () => {
+  const runMigration = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch('/api/marketmaker/balance');
-      if (!response.ok) {
-        throw new Error('Failed to fetch market maker balance');
-      }
+      const response = await fetch('/api/admin/migrate-database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
       const data = await response.json();
-      setMarketMaker(data.marketMaker);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setMigrationResult(data);
+    } catch (error) {
+      setMigrationResult({
+        success: false,
+        error: 'Failed to run migration',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (!session || !isAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  const checkMonitoringStatus = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/crypto/monitor-deposits');
+      const data = await response.json();
+      setMonitoringStatus(data);
+    } catch (error) {
+      setMonitoringStatus({
+        status: 'error',
+        error: 'Failed to check monitoring status',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#181A20] py-8 px-4">
-        <div className="container mx-auto">
-          <h1 className="text-3xl font-bold text-white mb-8">Admin Dashboard</h1>
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const testBinanceAPI = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/setup-binance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test-credentials' })
+      });
+      const data = await response.json();
+      setBinanceStatus(data);
+    } catch (error) {
+      setBinanceStatus({
+        valid: false,
+        error: 'Failed to test Binance API',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#181A20] py-8 px-4">
-        <div className="container mx-auto">
-          <h1 className="text-3xl font-bold text-white mb-8">Admin Dashboard</h1>
-          <div className="text-red-500">Error: {error}</div>
-        </div>
-      </div>
-    );
-  }
+  const startMonitoring = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/crypto/monitor-deposits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      alert(data.success ? 'Monitoring completed successfully!' : `Error: ${data.error}`);
+    } catch (error) {
+      alert(`Failed to start monitoring: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#181A20] py-8 px-4">
-      <div className="container mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-8">Admin Dashboard</h1>
-        
-        {/* Market Maker Balance Card */}
-        <div className="bg-[#23262F] rounded-2xl shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Market Maker Account</h2>
-          {marketMaker && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#1A1C23] p-4 rounded-lg">
-                <p className="text-gray-400 text-sm">Account</p>
-                <p className="text-white font-semibold">{marketMaker.username}</p>
-                <p className="text-gray-500 text-xs">{marketMaker.email}</p>
-              </div>
-              <div className="bg-[#1A1C23] p-4 rounded-lg">
-                <p className="text-gray-400 text-sm">Commission Balance</p>
-                <p className="text-green-400 font-bold text-2xl">${marketMaker.balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-[#1A1C23] p-4 rounded-lg">
-                <p className="text-gray-400 text-sm">Account Created</p>
-                <p className="text-white font-semibold">
-                  {new Date(marketMaker.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="bg-[#1A1C23] p-4 rounded-lg">
-                <p className="text-gray-400 text-sm">Status</p>
-                <p className="text-green-400 font-semibold">Active</p>
-              </div>
+    <div className="min-h-screen bg-[#0F1419] py-8">
+      <div className="container mx-auto px-4 max-w-4xl">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
+          <p className="text-gray-400">Manage crypto deposit system and monitoring</p>
+        </div>
+
+        {/* Step 1: Database Migration */}
+        <div className="bg-[#23262F] rounded-2xl p-6 mb-6 border border-[#2A2D3A]">
+          <h2 className="text-xl font-semibold text-white mb-4">
+            🗄️ Step 1: Database Migration
+          </h2>
+          <p className="text-gray-400 mb-4">
+            Create crypto deposit tables and initialize supported cryptocurrencies
+          </p>
+          
+          <button
+            onClick={runMigration}
+            disabled={isLoading}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 mb-4"
+          >
+            {isLoading ? 'Running Migration...' : 'Run Database Migration'}
+          </button>
+
+          {migrationResult && (
+            <div className={`p-4 rounded-lg ${
+              migrationResult.success 
+                ? 'bg-green-900/30 border border-green-500' 
+                : 'bg-red-900/30 border border-red-500'
+            }`}>
+              <h3 className={`font-medium mb-2 ${
+                migrationResult.success ? 'text-green-400' : 'text-red-400'
+              }`}>
+                Migration Result
+              </h3>
+              <p className="text-gray-300 text-sm mb-2">{migrationResult.message}</p>
+              {migrationResult.details && (
+                <pre className="text-xs text-gray-400 bg-black/30 p-2 rounded overflow-auto">
+                  {JSON.stringify(migrationResult.details, null, 2)}
+                </pre>
+              )}
             </div>
           )}
+        </div>
+
+        {/* Step 2: Binance API Test */}
+        <div className="bg-[#23262F] rounded-2xl p-6 mb-6 border border-[#2A2D3A]">
+          <h2 className="text-xl font-semibold text-white mb-4">
+            🔑 Step 2: Binance API Test
+          </h2>
+          <p className="text-gray-400 mb-4">
+            Test your Binance API credentials for automatic deposit monitoring
+          </p>
           
-          <div className="mt-4 flex gap-4">
-            <button
-              onClick={fetchMarketMakerBalance}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-            >
-              Refresh Balance
-            </button>
+          <button
+            onClick={testBinanceAPI}
+            disabled={isLoading}
+            className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 mb-4"
+          >
+            {isLoading ? 'Testing API...' : 'Test Binance API'}
+          </button>
+
+          {binanceStatus && (
+            <div className={`p-4 rounded-lg ${
+              binanceStatus.valid 
+                ? 'bg-green-900/30 border border-green-500' 
+                : 'bg-red-900/30 border border-red-500'
+            }`}>
+              <h3 className={`font-medium mb-2 ${
+                binanceStatus.valid ? 'text-green-400' : 'text-red-400'
+              }`}>
+                Binance API Status
+              </h3>
+              <p className="text-gray-300 text-sm mb-2">{binanceStatus.message}</p>
+              {binanceStatus.error && (
+                <p className="text-red-400 text-sm">{binanceStatus.error}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Step 3: Monitoring Status */}
+        <div className="bg-[#23262F] rounded-2xl p-6 mb-6 border border-[#2A2D3A]">
+          <h2 className="text-xl font-semibold text-white mb-4">
+            📊 Step 3: Monitoring Status
+          </h2>
+          <p className="text-gray-400 mb-4">
+            Check if automatic deposit monitoring is ready
+          </p>
+          
+          <button
+            onClick={checkMonitoringStatus}
+            disabled={isLoading}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 mb-4"
+          >
+            {isLoading ? 'Checking Status...' : 'Check Monitoring Status'}
+          </button>
+
+          {monitoringStatus && (
+            <div className={`p-4 rounded-lg ${
+              monitoringStatus.status === 'active' 
+                ? 'bg-green-900/30 border border-green-500' 
+                : 'bg-yellow-900/30 border border-yellow-500'
+            }`}>
+              <h3 className={`font-medium mb-2 ${
+                monitoringStatus.status === 'active' ? 'text-green-400' : 'text-yellow-400'
+              }`}>
+                Monitoring Status: {monitoringStatus.status}
+              </h3>
+              <p className="text-gray-300 text-sm mb-2">{monitoringStatus.message}</p>
+              
+              {monitoringStatus.requirements && (
+                <div className="mt-3">
+                  <h4 className="text-white text-sm font-medium mb-2">Requirements:</h4>
+                  <ul className="text-sm space-y-1">
+                    <li className="text-gray-300">
+                      Binance API: {monitoringStatus.requirements.binanceApi}
+                    </li>
+                    <li className="text-gray-300">
+                      Database: {monitoringStatus.requirements.database}
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Step 4: Start Monitoring */}
+        <div className="bg-[#23262F] rounded-2xl p-6 mb-6 border border-[#2A2D3A]">
+          <h2 className="text-xl font-semibold text-white mb-4">
+            🚀 Step 4: Start Monitoring
+          </h2>
+          <p className="text-gray-400 mb-4">
+            Manually trigger deposit monitoring to test the system
+          </p>
+          
+          <button
+            onClick={startMonitoring}
+            disabled={isLoading}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 mb-4"
+          >
+            {isLoading ? 'Starting Monitoring...' : 'Start Deposit Monitoring'}
+          </button>
+
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mt-4">
+            <h3 className="text-blue-400 font-medium mb-2">ℹ️ How it works:</h3>
+            <ul className="text-gray-300 text-sm space-y-1">
+              <li>• Checks your Binance account for new deposits</li>
+              <li>• Matches deposits with pending transactions in database</li>
+              <li>• Automatically credits user balances</li>
+              <li>• Updates deposit statuses to confirmed</li>
+            </ul>
           </div>
         </div>
 
-        {/* Commission Info */}
-        <div className="bg-[#23262F] rounded-2xl shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Commission Settings</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#1A1C23] p-4 rounded-lg">
-              <p className="text-gray-400 text-sm">Commission Rate</p>
-              <p className="text-yellow-400 font-bold text-xl">0.02%</p>
-            </div>
-            <div className="bg-[#1A1C23] p-4 rounded-lg">
-              <p className="text-gray-400 text-sm">Applied On</p>
-              <p className="text-white font-semibold">All Trades</p>
-            </div>
-            <div className="bg-[#1A1C23] p-4 rounded-lg">
-              <p className="text-gray-400 text-sm">Collection Method</p>
-              <p className="text-white font-semibold">Automatic</p>
-            </div>
-          </div>
-          
-          <div className="mt-4 p-4 bg-[#1A1C23] rounded-lg">
-            <h3 className="text-white font-semibold mb-2">How Commission Works:</h3>
-            <ul className="text-gray-400 text-sm space-y-1">
-              <li>• 0.02% commission is charged on every trade (both opening and closing positions)</li>
-              <li>• Commission is automatically deducted from trader's balance</li>
-              <li>• Commission is automatically transferred to market maker account</li>
-              <li>• Commission is calculated on trade value (price × quantity)</li>
-            </ul>
+        {/* Quick Links */}
+        <div className="bg-[#23262F] rounded-2xl p-6 border border-[#2A2D3A]">
+          <h2 className="text-xl font-semibold text-white mb-4">🔗 Quick Links</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a
+              href="/deposit"
+              className="block p-4 bg-[#1A1C23] rounded-lg border border-[#2A2D3A] hover:border-blue-500 transition-colors"
+            >
+              <h3 className="text-white font-medium">Deposit Page</h3>
+              <p className="text-gray-400 text-sm">Test the user deposit interface</p>
+            </a>
+            <a
+              href="/account"
+              className="block p-4 bg-[#1A1C23] rounded-lg border border-[#2A2D3A] hover:border-blue-500 transition-colors"
+            >
+              <h3 className="text-white font-medium">Account Page</h3>
+              <p className="text-gray-400 text-sm">View user account and transactions</p>
+            </a>
           </div>
         </div>
       </div>
