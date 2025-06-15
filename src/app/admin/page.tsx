@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 interface ApiResponse {
   success?: boolean;
@@ -12,10 +14,29 @@ interface ApiResponse {
 }
 
 export default function AdminPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [migrationResult, setMigrationResult] = useState<ApiResponse | null>(null);
   const [monitoringStatus, setMonitoringStatus] = useState<ApiResponse | null>(null);
   const [binanceStatus, setBinanceStatus] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Allow access for admin email or if not authenticated (for testing)
+  const isAdmin = !session || session?.user?.email === 'omeersahiiin8@gmail.com';
+
+  useEffect(() => {
+    if (status === 'loading') return; // Still loading
+    
+    if (status === 'unauthenticated') {
+      // Allow access for testing, but show a warning
+      return;
+    }
+    
+    if (session && !isAdmin) {
+      router.push('/');
+      return;
+    }
+  }, [session, status, isAdmin, router]);
 
   const runMigration = async () => {
     setIsLoading(true);
@@ -91,6 +112,14 @@ export default function AdminPage() {
     }
   };
 
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0F1419] py-8">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -98,6 +127,24 @@ export default function AdminPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
           <p className="text-gray-400">Manage crypto deposit system and monitoring</p>
+          
+          {/* Access Info */}
+          {!session && (
+            <div className="mt-4 p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-lg">
+              <p className="text-yellow-400 text-sm">
+                ⚠️ You're accessing admin functions without authentication. 
+                For security, please <a href="/auth/signin" className="underline">sign in</a> with admin account.
+              </p>
+            </div>
+          )}
+          
+          {session && (
+            <div className="mt-4 p-4 bg-blue-900/30 border border-blue-500/30 rounded-lg">
+              <p className="text-blue-400 text-sm">
+                👋 Welcome, {session.user?.email} - Admin Access Granted
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Step 1: Database Migration */}
