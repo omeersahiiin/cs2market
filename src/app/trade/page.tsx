@@ -729,7 +729,7 @@ export default function TradePage() {
                                       }`}>
                                         {order.positionType}
                                       </span>
-                                      <span className="text-white font-medium text-xs">{order.skin?.name?.split(' | ')[0] || 'Unknown'}</span>
+                                      <span className="text-white font-medium text-xs">{order.skin?.name || 'Unknown'}</span>
                                     </div>
                                   </td>
                                   <td className="py-3 px-2">

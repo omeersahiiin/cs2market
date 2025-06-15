@@ -691,7 +691,7 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                                 }`}>
                                   {position.type}
                                 </span>
-                                <span className="text-white font-medium text-base">{skin.name.split(' | ')[0]}</span>
+                                <span className="text-white font-medium text-base">{skin.name}</span>
                               </div>
                             </td>
                             <td className="py-4 px-3">
@@ -839,7 +839,7 @@ export default function SkinDetailsPage({ params }: { params: { id: string } }) 
                               }`}>
                                 {order.positionType}
                               </span>
-                                                                    <span className="text-white font-medium">{order.skin?.name?.split(' | ')[0] || 'Unknown'}</span>
+                                                                    <span className="text-white font-medium">{order.skin?.name || 'Unknown'}</span>
                             </div>
                           </td>
                           <td className="py-4 px-3">
