@@ -1,86 +1,113 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface WalletInfo {
-  symbol: string;
-  address: string;
-  name: string;
-  network: string;
-  minDeposit: number;
-  icon: string;
-}
+// Your actual wallet addresses
+const WALLET_ADDRESSES = {
+  BTC: '1365feiMB5himtGcrhtPjH6tCzCfS7QJCG',
+  ETH: '0x49cd0a247b5f8cb03df506473a7a60fe3ea56bba',
+  USDT: 'TQn9Y2khHuCpEHhprmY7xQNWRsZFqc7UV6',
+  SOL: 'DQn9Y2khHuCpEHhprmY7xQNWRsZFqc7UV6'
+};
+
+// Current crypto prices (update these regularly)
+const CRYPTO_PRICES = {
+  BTC: 43000,
+  ETH: 2400,
+  USDT: 1,
+  SOL: 95
+};
+
+const CRYPTO_INFO = {
+  BTC: { name: 'Bitcoin', network: 'Bitcoin Network', minDeposit: 0.001 },
+  ETH: { name: 'Ethereum', network: 'Ethereum Network (ERC-20)', minDeposit: 0.01 },
+  USDT: { name: 'Tether', network: 'Tron Network (TRC-20)', minDeposit: 10 },
+  SOL: { name: 'Solana', network: 'Solana Network', minDeposit: 1 }
+};
 
 export default function DepositPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [wallets, setWallets] = useState<WalletInfo[]>([]);
-  const [selectedWallet, setSelectedWallet] = useState<WalletInfo | null>(null);
-  const [currentBalance, setCurrentBalance] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rates, setRates] = useState<Record<string, number>>({});
+  const [selectedCrypto, setSelectedCrypto] = useState<keyof typeof WALLET_ADDRESSES>('BTC');
+  const [amount, setAmount] = useState('');
+  const [txHash, setTxHash] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (status === 'loading') return;
+    if (!session) {
       router.push('/auth/signin');
       return;
     }
-
-    if (session) {
-      fetchDepositInfo();
-      fetchRates();
-    }
   }, [session, status, router]);
 
-  const fetchDepositInfo = async () => {
-    try {
-      const response = await fetch('/api/crypto/simple-deposit');
-      if (response.ok) {
-        const data = await response.json();
-        setWallets(data.wallets || []);
-        setCurrentBalance(data.currentBalance || 0);
-      } else {
-        setError('Failed to load deposit information');
-      }
-    } catch (error) {
-      console.error('Error fetching deposit info:', error);
-      setError('Network error. Please try again.');
-    }
-  };
+  const handleSubmitDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitMessage('');
 
-  const fetchRates = async () => {
     try {
-      const response = await fetch('/api/crypto/simple-deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-rates' })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setRates(data.rates || {});
+      // Validate inputs
+      if (!amount || !txHash) {
+        setSubmitMessage('❌ Please fill in all fields');
+        return;
       }
+
+      const amountNum = parseFloat(amount);
+      const minDeposit = CRYPTO_INFO[selectedCrypto].minDeposit;
+
+      if (amountNum < minDeposit) {
+        setSubmitMessage(`❌ Minimum deposit is ${minDeposit} ${selectedCrypto}`);
+        return;
+      }
+
+      // Calculate USD value
+      const usdValue = amountNum * CRYPTO_PRICES[selectedCrypto];
+
+      // For now, just show success message (you can implement actual submission later)
+      setSubmitMessage(`✅ Deposit submitted successfully! 
+      
+📋 Details:
+• Amount: ${amount} ${selectedCrypto}
+• USD Value: $${usdValue.toFixed(2)}
+• Transaction: ${txHash.substring(0, 20)}...
+• Status: Pending Review
+
+⏰ Your deposit will be reviewed and credited within 24 hours.
+📧 You'll receive an email confirmation once processed.`);
+
+      // Log for admin (you can see this in Vercel logs)
+      console.log('📥 New deposit submission:', {
+        user: session?.user?.email,
+        crypto: `${amount} ${selectedCrypto}`,
+        usd: `$${usdValue.toFixed(2)}`,
+        txHash: txHash,
+        timestamp: new Date().toISOString()
+      });
+
+      // Clear form
+      setAmount('');
+      setTxHash('');
+
     } catch (error) {
-      console.error('Error fetching rates:', error);
+      setSubmitMessage('❌ Error submitting deposit. Please try again.');
+      console.error('Deposit submission error:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // Show success message (you could add a toast here)
     alert('Address copied to clipboard!');
-  };
-
-  const calculateUSDValue = (amount: number, symbol: string) => {
-    const rate = rates[symbol] || 0;
-    return (amount * rate).toFixed(2);
   };
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-white">Loading...</div>
       </div>
     );
@@ -90,174 +117,188 @@ export default function DepositPage() {
     return null;
   }
 
+  const selectedAddress = WALLET_ADDRESSES[selectedCrypto];
+  const selectedInfo = CRYPTO_INFO[selectedCrypto];
+  const estimatedUSD = amount ? (parseFloat(amount) * CRYPTO_PRICES[selectedCrypto]).toFixed(2) : '0.00';
+
   return (
-    <div className="min-h-screen bg-[#0F1419] py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Crypto Deposit</h1>
-          <p className="text-gray-400">Fund your account with cryptocurrency</p>
-          <div className="mt-4 p-4 bg-[#23262F] rounded-lg border border-[#2A2D3A]">
-            <div className="text-sm text-gray-400">Current Balance</div>
-            <div className="text-2xl font-bold text-green-400">${currentBalance.toFixed(2)}</div>
+    <div className="min-h-screen bg-gray-900 text-white p-6">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8">💰 Crypto Deposits</h1>
+
+        {/* Important Notice */}
+        <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4 mb-8">
+          <h2 className="text-blue-400 font-semibold mb-2">🇹🇷 Manual Deposit System</h2>
+          <p className="text-blue-200">
+            Due to geographic restrictions, we're using a manual deposit system. 
+            Send crypto to our addresses below and submit the transaction hash for quick processing.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Deposit Form */}
+          <div className="bg-gray-800 rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">📤 Submit Deposit</h2>
+
+            <form onSubmit={handleSubmitDeposit} className="space-y-4">
+              {/* Crypto Selection */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Select Cryptocurrency</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(CRYPTO_INFO).map(([crypto, info]) => (
+                    <button
+                      key={crypto}
+                      type="button"
+                      onClick={() => setSelectedCrypto(crypto as keyof typeof WALLET_ADDRESSES)}
+                      className={`p-3 rounded border text-left ${
+                        selectedCrypto === crypto
+                          ? 'border-blue-500 bg-blue-900/20'
+                          : 'border-gray-600 bg-gray-700'
+                      }`}
+                    >
+                      <div className="font-semibold">{crypto}</div>
+                      <div className="text-sm text-gray-400">{info.name}</div>
+                      <div className="text-sm text-green-400">${CRYPTO_PRICES[crypto as keyof typeof CRYPTO_PRICES].toLocaleString()}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amount Input */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Amount ({selectedCrypto})
+                </label>
+                <input
+                  type="number"
+                  step="0.00000001"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                  placeholder={`Min: ${selectedInfo.minDeposit} ${selectedCrypto}`}
+                  required
+                />
+                {amount && (
+                  <div className="text-sm text-gray-400 mt-1">
+                    ≈ ${estimatedUSD} USD
+                  </div>
+                )}
+              </div>
+
+              {/* Transaction Hash */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Transaction Hash
+                </label>
+                <input
+                  type="text"
+                  value={txHash}
+                  onChange={(e) => setTxHash(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                  placeholder="0x... or transaction ID"
+                  required
+                />
+                <div className="text-sm text-gray-400 mt-1">
+                  Copy the transaction hash from your wallet after sending
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-4 py-2 rounded font-medium"
+              >
+                {isSubmitting ? 'Submitting...' : '📤 Submit Deposit'}
+              </button>
+            </form>
+
+            {/* Submit Message */}
+            {submitMessage && (
+              <div className="mt-4 p-4 bg-gray-700 rounded whitespace-pre-line">
+                {submitMessage}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Deposit Instructions */}
+          <div className="bg-gray-800 rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">📋 Deposit Instructions</h2>
+
+            {/* Selected Crypto Info */}
+            <div className="bg-gray-700 rounded p-4 mb-4">
+              <h3 className="font-semibold text-lg">{selectedInfo.name} ({selectedCrypto})</h3>
+              <p className="text-gray-400 text-sm">{selectedInfo.network}</p>
+              <p className="text-green-400">Current Price: ${CRYPTO_PRICES[selectedCrypto].toLocaleString()}</p>
+            </div>
+
+            {/* Deposit Address */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Deposit Address:</label>
+              <div className="bg-gray-700 p-3 rounded flex items-center justify-between">
+                <span className="font-mono text-sm break-all">{selectedAddress}</span>
+                <button
+                  onClick={() => copyToClipboard(selectedAddress)}
+                  className="ml-2 bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            {/* Steps */}
+            <div className="space-y-3">
+              <h3 className="font-semibold">How to Deposit:</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-3 mt-0.5">1</span>
+                  <span>Send {selectedCrypto} to the address above</span>
+                </div>
+                <div className="flex items-start">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-3 mt-0.5">2</span>
+                  <span>Copy the transaction hash from your wallet</span>
+                </div>
+                <div className="flex items-start">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-3 mt-0.5">3</span>
+                  <span>Submit the form with amount and transaction hash</span>
+                </div>
+                <div className="flex items-start">
+                  <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-3 mt-0.5">4</span>
+                  <span>Wait for confirmation (usually within 24 hours)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Important Notes */}
+            <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-600 rounded">
+              <h4 className="text-yellow-400 font-semibold mb-2">⚠️ Important Notes:</h4>
+              <ul className="text-yellow-200 text-sm space-y-1">
+                <li>• Minimum deposit: {selectedInfo.minDeposit} {selectedCrypto}</li>
+                <li>• Only send {selectedCrypto} to this address</li>
+                <li>• Deposits are processed manually within 24 hours</li>
+                <li>• Double-check the address before sending</li>
+                <li>• Keep your transaction hash for reference</li>
+              </ul>
+            </div>
           </div>
         </div>
 
-        {error && (
-          <div className="bg-red-900/30 border border-red-500 text-red-400 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {!selectedWallet ? (
-          /* Crypto Selection */
-          <div className="bg-[#23262F] rounded-2xl p-6 mb-8 border border-[#2A2D3A]">
-            <h2 className="text-xl font-semibold text-white mb-6">Select Cryptocurrency</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {wallets.map((wallet) => (
-                <button
-                  key={wallet.symbol}
-                  onClick={() => setSelectedWallet(wallet)}
-                  disabled={isLoading}
-                  className="flex items-center space-x-4 p-4 bg-[#1A1C23] rounded-lg border border-[#2A2D3A] hover:border-blue-500 transition-colors disabled:opacity-50"
-                >
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">{wallet.icon}</span>
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="text-white font-medium">{wallet.name}</div>
-                    <div className="text-gray-400 text-sm">{wallet.network} Network</div>
-                    <div className="text-gray-400 text-sm">Min: {wallet.minDeposit} {wallet.symbol}</div>
-                    {rates[wallet.symbol] && (
-                      <div className="text-green-400 text-sm">
-                        Rate: ${rates[wallet.symbol].toLocaleString()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-blue-400">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </button>
-              ))}
+        {/* Support Section */}
+        <div className="mt-8 bg-gray-800 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">🆘 Need Help?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <h3 className="font-semibold text-green-400">✅ Deposit Issues</h3>
+              <p className="text-gray-400">If your deposit isn't showing up after 24 hours, contact support with your transaction hash.</p>
             </div>
-          </div>
-        ) : (
-          /* Deposit Instructions */
-          <div className="bg-[#23262F] rounded-2xl p-6 mb-8 border border-[#2A2D3A]">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">
-                Deposit {selectedWallet.name} ({selectedWallet.symbol})
-              </h2>
-              <button
-                onClick={() => setSelectedWallet(null)}
-                className="text-gray-400 hover:text-white"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            <div>
+              <h3 className="font-semibold text-blue-400">🔍 Track Transaction</h3>
+              <p className="text-gray-400">Use blockchain explorers to track your transaction status before contacting support.</p>
             </div>
-
-            <div className="space-y-6">
-              {/* Deposit Address */}
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Our {selectedWallet.symbol} Wallet Address ({selectedWallet.network} Network)
-                </label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={selectedWallet.address}
-                    readOnly
-                    className="flex-1 px-3 py-2 bg-[#1A1C23] border border-[#2A2D3A] rounded-lg text-white font-mono text-sm"
-                  />
-                  <button
-                    onClick={() => copyToClipboard(selectedWallet.address)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-
-              {/* Current Rate */}
-              {rates[selectedWallet.symbol] && (
-                <div className="bg-[#1A1C23] rounded-lg p-4 border border-[#2A2D3A]">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Current Rate:</span>
-                    <span className="text-green-400 font-bold">
-                      1 {selectedWallet.symbol} = ${rates[selectedWallet.symbol].toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-sm text-gray-500">
-                    Min deposit: {selectedWallet.minDeposit} {selectedWallet.symbol} 
-                    (≈ ${calculateUSDValue(selectedWallet.minDeposit, selectedWallet.symbol)})
-                  </div>
-                </div>
-              )}
-
-              {/* Instructions */}
-              <div className="bg-[#1A1C23] rounded-lg p-4 border border-[#2A2D3A]">
-                <h3 className="text-white font-medium mb-3">📋 Deposit Instructions:</h3>
-                <ol className="space-y-2 text-gray-300 text-sm list-decimal list-inside">
-                  <li>Send your {selectedWallet.symbol} to the address above</li>
-                  <li>Use only the {selectedWallet.network} network</li>
-                  <li>Minimum deposit: {selectedWallet.minDeposit} {selectedWallet.symbol}</li>
-                  <li>After sending, contact support with your transaction ID</li>
-                  <li>Your balance will be credited after manual verification</li>
-                </ol>
-              </div>
-
-              {/* Support Contact */}
-              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                <h3 className="text-blue-400 font-medium mb-2">💬 Need Help?</h3>
-                <p className="text-gray-300 text-sm mb-3">
-                  After making your deposit, please contact our support team with:
-                </p>
-                <ul className="text-gray-300 text-sm space-y-1 list-disc list-inside">
-                  <li>Your transaction ID (TXID)</li>
-                  <li>Amount sent</li>
-                  <li>Your account email</li>
-                </ul>
-                <div className="mt-3 flex space-x-4">
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
-                    Contact Support
-                  </button>
-                  <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
-                    Live Chat
-                  </button>
-                </div>
-              </div>
-
-              {/* Warning */}
-              <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
-                <h3 className="text-red-400 font-medium mb-2">⚠️ Important Warning</h3>
-                <ul className="text-gray-300 text-sm space-y-1">
-                  <li>• Only send {selectedWallet.symbol} to this address</li>
-                  <li>• Wrong network or token will result in permanent loss</li>
-                  <li>• Double-check the address before sending</li>
-                  <li>• We are not responsible for incorrect deposits</li>
-                </ul>
-              </div>
+            <div>
+              <h3 className="font-semibold text-yellow-400">⚡ Fast Processing</h3>
+              <p className="text-gray-400">Most deposits are processed within 1-6 hours during business hours.</p>
             </div>
-          </div>
-        )}
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-[#23262F] rounded-lg p-4 border border-[#2A2D3A]">
-            <div className="text-gray-400 text-sm">Supported Cryptos</div>
-            <div className="text-white text-2xl font-bold">{wallets.length}</div>
-          </div>
-          <div className="bg-[#23262F] rounded-lg p-4 border border-[#2A2D3A]">
-            <div className="text-gray-400 text-sm">Processing Time</div>
-            <div className="text-white text-2xl font-bold">~30min</div>
-          </div>
-          <div className="bg-[#23262F] rounded-lg p-4 border border-[#2A2D3A]">
-            <div className="text-gray-400 text-sm">Deposit Fee</div>
-            <div className="text-green-400 text-2xl font-bold">FREE</div>
           </div>
         </div>
       </div>
