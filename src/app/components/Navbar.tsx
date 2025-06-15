@@ -91,16 +91,16 @@ export default function Navbar() {
             ) : (
               <div className="flex items-center space-x-3">
                 <Link
-                  href="/api/auth/signin"
+                  href="/auth/signin"
                   className="px-4 py-2 text-gray-300 hover:text-white transition-colors duration-200"
                 >
                   Sign In
                 </Link>
                 <Link
-                  href="/api/auth/signin"
+                  href="/auth/register"
                   className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105"
                 >
-                  Get Started
+                  Sign Up
                 </Link>
               </div>
             )}
@@ -172,18 +172,18 @@ export default function Navbar() {
               ) : (
                 <div className="px-4 py-2 border-t border-[#2A2D3A] mt-4 pt-4 space-y-2">
                   <Link
-                    href="/api/auth/signin"
+                    href="/auth/signin"
                     onClick={() => setIsMenuOpen(false)}
                     className="block px-4 py-2 text-gray-300 hover:text-white transition-colors duration-200"
                   >
                     Sign In
                   </Link>
                   <Link
-                    href="/api/auth/signin"
+                    href="/auth/register"
                     onClick={() => setIsMenuOpen(false)}
                     className="block px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-center"
                   >
-                    Get Started
+                    Sign Up
                   </Link>
                 </div>
               )}

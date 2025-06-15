@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
+import { PrismaClientSingleton } from '@/lib/prisma';
 
 export async function POST(request: Request) {
   try {
@@ -17,14 +15,19 @@ export async function POST(request: Request) {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { username }
-        ]
-      }
-    });
+    const existingUser = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email },
+              { username }
+            ]
+          }
+        });
+      },
+      'check existing user'
+    );
 
     if (existingUser) {
       return NextResponse.json(
@@ -37,14 +40,19 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        username,
-        password: hashedPassword,
-        balance: 10000, // Starting balance for testing
+    const user = await PrismaClientSingleton.executeWithRetry(
+      async (prisma) => {
+        return await prisma.user.create({
+          data: {
+            email,
+            username,
+            password: hashedPassword,
+            balance: 10000, // Starting balance for testing
+          },
+        });
       },
-    });
+      'create new user'
+    );
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
