@@ -15,7 +15,7 @@ interface UserStats {
 
 interface Transaction {
   id: string;
-  type: 'TRADE' | 'POSITION_OPEN' | 'POSITION_CLOSE' | 'FEE' | 'DEPOSIT';
+  type: 'TRADE' | 'POSITION_OPEN' | 'POSITION_CLOSE' | 'FEE' | 'DEPOSIT' | 'CRYPTO_DEPOSIT';
   amount: number;
   description: string;
   createdAt: string;
@@ -165,7 +165,10 @@ export default function AccountPage() {
             <div>
               <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
               <div className="space-y-2">
-                <button className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <button 
+                  onClick={() => router.push('/deposit')}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
                   Deposit Funds
                 </button>
                 <button className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
@@ -241,7 +244,7 @@ export default function AccountPage() {
                   <div key={transaction.id} className="flex items-center justify-between py-3 border-b border-[#2A2D3A] last:border-b-0">
                     <div className="flex items-center space-x-3">
                       <div className={`w-2 h-2 rounded-full ${
-                        transaction.type === 'DEPOSIT' ? 'bg-green-400' :
+                        transaction.type === 'DEPOSIT' || transaction.type === 'CRYPTO_DEPOSIT' ? 'bg-green-400' :
                         transaction.type === 'POSITION_CLOSE' ? 'bg-red-400' :
                         transaction.type === 'TRADE' ? 'bg-blue-400' :
                         transaction.type === 'POSITION_OPEN' ? 'bg-yellow-400' :
@@ -283,7 +286,7 @@ export default function AccountPage() {
                       <td className="py-3 px-2 text-gray-300">{formatDate(transaction.createdAt)}</td>
                       <td className="py-3 px-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          transaction.type === 'DEPOSIT' ? 'bg-green-900/30 text-green-400' :
+                          transaction.type === 'DEPOSIT' || transaction.type === 'CRYPTO_DEPOSIT' ? 'bg-green-900/30 text-green-400' :
                           transaction.type === 'POSITION_CLOSE' ? 'bg-red-900/30 text-red-400' :
                           transaction.type === 'TRADE' ? 'bg-blue-900/30 text-blue-400' :
                           transaction.type === 'POSITION_OPEN' ? 'bg-yellow-900/30 text-yellow-400' :

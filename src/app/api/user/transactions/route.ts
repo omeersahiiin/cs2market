@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 interface Transaction {
   id: string;
-  type: 'TRADE' | 'POSITION_OPEN' | 'POSITION_CLOSE' | 'FEE' | 'DEPOSIT';
+  type: 'TRADE' | 'POSITION_OPEN' | 'POSITION_CLOSE' | 'FEE' | 'DEPOSIT' | 'CRYPTO_DEPOSIT';
   amount: number;
   description: string;
   createdAt: string;
@@ -134,16 +134,28 @@ export async function GET(request: NextRequest) {
           });
         });
 
-        // Add initial deposit transaction for new users
-        if (allTransactions.length === 0) {
-          allTransactions.push({
-            id: `deposit-initial`,
-            type: 'DEPOSIT',
-            amount: 10000,
-            description: 'Initial account deposit',
-            createdAt: user.createdAt.toISOString()
-          });
-        }
+        // Get crypto deposits
+        const cryptoDeposits = await prisma.cryptoDeposit.findMany({
+          where: {
+            userId: user.id,
+            status: 'CREDITED'
+          },
+          orderBy: { creditedAt: 'desc' },
+          take: 25
+        });
+
+        // Add crypto deposit transactions
+        cryptoDeposits.forEach(deposit => {
+          if (deposit.usdValue && deposit.creditedAt) {
+            allTransactions.push({
+              id: `crypto-deposit-${deposit.id}`,
+              type: 'CRYPTO_DEPOSIT',
+              amount: deposit.usdValue,
+              description: `Crypto deposit: ${deposit.amount} ${deposit.cryptocurrency}`,
+              createdAt: deposit.creditedAt.toISOString()
+            });
+          }
+        });
 
         // Sort all transactions by date (newest first)
         return allTransactions.sort((a, b) => 

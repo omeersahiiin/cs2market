@@ -47,7 +47,7 @@ export async function POST(request: Request) {
             email,
             username,
             password: hashedPassword,
-            balance: 10000, // Starting balance for testing
+            balance: 0, // Users start with $0 and must deposit crypto
           },
         });
       },

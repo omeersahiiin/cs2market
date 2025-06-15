@@ -27,7 +27,10 @@ export default function Navbar() {
     { href: '/skins', label: 'Market' },
     { href: '/trade', label: 'Trading' },
     { href: '/portfolio', label: 'Portfolio' },
-    ...(session ? [{ href: '/admin/risk', label: 'Risk Monitor' }] : []),
+    ...(session ? [
+      { href: '/deposit', label: 'Deposit' },
+      { href: '/admin/risk', label: 'Risk Monitor' }
+    ] : []),
   ];
 
   return (
