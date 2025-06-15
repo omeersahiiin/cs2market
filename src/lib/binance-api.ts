@@ -22,14 +22,16 @@ interface WalletBalance {
   locked: string;
 }
 
-// Multiple Binance endpoints to try
+// Multiple Binance endpoints to try - prioritizing alternatives that might work from Turkey
 const BINANCE_ENDPOINTS = [
-  'https://api.binance.com',
+  'https://api.binance.vision', // Try production vision first (since testnet worked)
+  'https://data-api.binance.vision', // Data API endpoint
+  'https://stream.binance.vision', // Stream endpoint
+  'https://api.binance.com', // Main (likely blocked but try anyway)
   'https://api1.binance.com', 
   'https://api2.binance.com',
   'https://api3.binance.com',
-  'https://api.binance.cc', // Alternative domain
-  'https://api.binance.vision' // Another alternative
+  'https://api.binance.cc' // Alternative domain
 ];
 
 export class BinanceAPI {
@@ -61,12 +63,23 @@ export class BinanceAPI {
       return null;
     }
 
-    console.log('🔍 Testing multiple Binance endpoints for Turkey...');
+    console.log('🔍 Testing Binance endpoints for Turkey (prioritizing alternatives)...');
 
     for (const endpoint of BINANCE_ENDPOINTS) {
       try {
         console.log(`🧪 Testing endpoint: ${endpoint}`);
         
+        // First test basic connectivity
+        const pingResponse = await fetch(`${endpoint}/api/v3/ping`, {
+          signal: AbortSignal.timeout(5000)
+        });
+
+        if (!pingResponse.ok) {
+          console.log(`❌ Ping failed for ${endpoint}: ${pingResponse.status}`);
+          continue;
+        }
+
+        // If ping works, test with authentication
         const timestamp = Date.now();
         const queryString = `timestamp=${timestamp}`;
         const signature = this.createSignature(queryString, config.secretKey);
@@ -77,25 +90,25 @@ export class BinanceAPI {
             'X-MBX-APIKEY': config.apiKey,
             'Content-Type': 'application/json'
           },
-          // Add timeout to avoid hanging
-          signal: AbortSignal.timeout(10000) // 10 second timeout
+          signal: AbortSignal.timeout(10000)
         });
 
         if (response.ok) {
-          console.log(`✅ Found working endpoint: ${endpoint}`);
+          console.log(`✅ Found working production endpoint: ${endpoint}`);
           this.workingEndpoint = endpoint;
           this.baseUrl = endpoint;
           return endpoint;
         } else {
-          console.log(`❌ Endpoint ${endpoint} failed with status:`, response.status);
+          const errorText = await response.text();
+          console.log(`❌ Auth failed for ${endpoint}: ${response.status} - ${errorText}`);
         }
       } catch (error) {
-        console.log(`❌ Endpoint ${endpoint} failed with error:`, error instanceof Error ? error.message : 'Unknown error');
+        console.log(`❌ Endpoint ${endpoint} failed:`, error instanceof Error ? error.message : 'Unknown error');
         continue;
       }
     }
 
-    console.error('❌ No working Binance endpoints found');
+    console.error('❌ No working Binance production endpoints found');
     return null;
   }
 
@@ -111,7 +124,7 @@ export class BinanceAPI {
     if (!this.workingEndpoint) {
       const workingUrl = await this.findWorkingEndpoint();
       if (!workingUrl) {
-        throw new Error('No accessible Binance endpoints found from your location');
+        throw new Error('No accessible Binance endpoints found from your location. Consider using a VPN.');
       }
     }
 
@@ -242,7 +255,10 @@ export class BinanceAPI {
       return true;
     } else {
       console.error('❌ All Binance endpoints are blocked from your location');
-      console.log('💡 Consider using a VPN or proxy server');
+      console.log('💡 Recommendations:');
+      console.log('   1. Use VPN (NordVPN, ExpressVPN) with Singapore/Japan server');
+      console.log('   2. Set up proxy server in allowed region');
+      console.log('   3. Use manual deposit system as fallback');
       return false;
     }
   }
