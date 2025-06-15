@@ -51,18 +51,18 @@ export default function DepositPage() {
     {
       id: '3',
       symbol: 'USDT',
-      name: 'Tether',
-      network: 'Ethereum',
+      name: 'Tether (TRC20)',
+      network: 'Tron',
       minDeposit: 10,
       iconUrl: '/crypto/usdt.png'
     },
     {
       id: '4',
-      symbol: 'TRX',
-      name: 'Tron',
-      network: 'Tron',
-      minDeposit: 100,
-      iconUrl: '/crypto/trx.png'
+      symbol: 'SOL',
+      name: 'Solana',
+      network: 'Solana',
+      minDeposit: 0.1,
+      iconUrl: '/crypto/sol.png'
     }
   ]);
   

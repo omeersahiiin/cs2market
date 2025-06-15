@@ -27,10 +27,7 @@ export default function Navbar() {
     { href: '/skins', label: 'Market' },
     { href: '/trade', label: 'Trading' },
     { href: '/portfolio', label: 'Portfolio' },
-    ...(session ? [
-      { href: '/deposit', label: 'Deposit' },
-      { href: '/admin/risk', label: 'Risk Monitor' }
-    ] : []),
+    ...(session ? [{ href: '/admin/risk', label: 'Risk Monitor' }] : []),
   ];
 
   return (
@@ -73,6 +70,12 @@ export default function Navbar() {
                       ${balance !== null ? balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '...'}
                     </div>
                   </div>
+                  <Link
+                    href="/deposit"
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 text-sm font-medium"
+                  >
+                    Deposit
+                  </Link>
                   <Link
                     href="/account"
                     className={`px-3 py-2 rounded-lg transition-colors duration-200 ${
@@ -150,6 +153,13 @@ export default function Navbar() {
                     <div className="text-green-400 font-semibold mb-4">
                       ${balance !== null ? balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '...'}
                     </div>
+                    <Link
+                      href="/deposit"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 mb-2 text-center font-medium"
+                    >
+                      Deposit
+                    </Link>
                     <Link
                       href="/account"
                       onClick={() => setIsMenuOpen(false)}

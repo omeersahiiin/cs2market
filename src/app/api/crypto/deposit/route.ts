@@ -5,22 +5,26 @@ import { PrismaClientSingleton } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// Generate a deposit address (placeholder - you'll integrate with actual wallet service)
+// Generate a deposit address using your real wallet addresses
 function generateDepositAddress(cryptocurrency: string, network: string): string {
-  // This is a placeholder - replace with actual wallet service integration
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  
+  // Real wallet addresses for deposits
   switch (cryptocurrency.toUpperCase()) {
     case 'BTC':
-      return `bc1q${random}${timestamp.toString().slice(-6)}`;
+      return '1365feiMB5himtGcrhtPjH6tCzCfS7QJCG';
     case 'ETH':
+      return '0x49cd0a247b5f8cb03df506473a7a60fe3ea56bba';
     case 'USDT':
-      return `0x${random}${timestamp.toString(16)}`.substring(0, 42);
+      if (network === 'Tron') {
+        return 'TC49w5CVFdbsdxvoCSiWY4ANtCxFBbbC1Y';
+      } else {
+        return '0x49cd0a247b5f8cb03df506473a7a60fe3ea56bba'; // ETH network
+      }
+    case 'SOL':
+      return 'HE7xDMhz4qHEvJL1vaT9eHpHDaGYAWQvqwniMTjBFLuU';
     case 'TRX':
-      return `T${random}${timestamp.toString().slice(-6)}`.substring(0, 34);
+      return 'TC49w5CVFdbsdxvoCSiWY4ANtCxFBbbC1Y';
     default:
-      return `${cryptocurrency.toLowerCase()}_${random}_${timestamp}`;
+      throw new Error(`Unsupported cryptocurrency: ${cryptocurrency}`);
   }
 }
 
@@ -147,9 +151,9 @@ function getRequiredConfirmations(cryptocurrency: string): number {
     case 'ETH':
       return 12;
     case 'USDT':
-      return 12; // Ethereum-based USDT
-    case 'TRX':
-      return 20;
+      return 20; // Tron-based USDT (TRC20)
+    case 'SOL':
+      return 1;
     default:
       return 1;
   }

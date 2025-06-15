@@ -10,7 +10,7 @@ async function getCryptoPriceUSD(cryptocurrency: string): Promise<number> {
     'BTC': 45000,
     'ETH': 2500,
     'USDT': 1,
-    'TRX': 0.08
+    'SOL': 100
   };
   
   return mockPrices[cryptocurrency.toUpperCase()] || 1;

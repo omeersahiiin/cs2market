@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       'BTC': 45000,
       'ETH': 2500,
       'USDT': 1,
-      'TRX': 0.08
+      'SOL': 100
     };
 
     const cryptoPrice = mockPrices[deposit.cryptocurrency] || 1;

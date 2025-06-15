@@ -25,24 +25,24 @@ const supportedCryptos = [
   },
   {
     symbol: 'USDT',
-    name: 'Tether',
-    network: 'Ethereum',
-    contractAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    name: 'Tether (TRC20)',
+    network: 'Tron',
+    contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
     decimals: 6,
     minDeposit: 10,
-    requiredConfirmations: 12,
+    requiredConfirmations: 20,
     depositFee: 0,
     iconUrl: '/crypto/usdt.png'
   },
   {
-    symbol: 'TRX',
-    name: 'Tron',
-    network: 'Tron',
-    decimals: 6,
-    minDeposit: 100,
-    requiredConfirmations: 20,
+    symbol: 'SOL',
+    name: 'Solana',
+    network: 'Solana',
+    decimals: 9,
+    minDeposit: 0.1,
+    requiredConfirmations: 1,
     depositFee: 0,
-    iconUrl: '/crypto/trx.png'
+    iconUrl: '/crypto/sol.png'
   }
 ];
 
