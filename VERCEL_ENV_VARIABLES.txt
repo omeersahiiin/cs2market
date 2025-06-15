@@ -19,6 +19,13 @@ PRICEMPIRE_RATE_LIMIT=100
 
 PRICEMPIRE_TIMEOUT=10000
 
+# ===== BINANCE API CONFIGURATION =====
+# ✅ CONFIGURED - Added to Vercel environment variables
+# Required for crypto deposit monitoring
+BINANCE_API_KEY=SybwxyenaAwjARObf6B4VTjDLLSVcAfjUykognmDp198TEwsTP9IB6xj2HewHKTZ
+
+BINANCE_SECRET_KEY=Xuki1c4BiPomehiQuPENm18V13Trd5dW60zZNnBF0eZVhlEhe7t6NjpFxTD1ubzy
+
 NODE_ENV=production
 
 DEBUG_PRICE_SERVICE=false

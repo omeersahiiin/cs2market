@@ -23,38 +23,46 @@ interface WalletBalance {
 }
 
 export class BinanceAPI {
-  private config: BinanceConfig;
+  private baseUrl = 'https://api.binance.com';
 
-  constructor() {
-    this.config = {
+  // Get config dynamically to ensure environment variables are loaded
+  private getConfig(): BinanceConfig {
+    return {
       apiKey: process.env.BINANCE_API_KEY || '',
       secretKey: process.env.BINANCE_SECRET_KEY || '',
-      baseUrl: 'https://api.binance.com'
+      baseUrl: this.baseUrl
     };
   }
 
-  private createSignature(queryString: string): string {
+  private createSignature(queryString: string, secretKey: string): string {
     return crypto
-      .createHmac('sha256', this.config.secretKey)
+      .createHmac('sha256', secretKey)
       .update(queryString)
       .digest('hex');
   }
 
   private async makeRequest(endpoint: string, params: Record<string, any> = {}): Promise<any> {
+    const config = this.getConfig();
+    
+    // Check if credentials are available
+    if (!config.apiKey || !config.secretKey) {
+      throw new Error('Binance API credentials not configured');
+    }
+
     const timestamp = Date.now();
     const queryParams = new URLSearchParams({
       ...params,
       timestamp: timestamp.toString()
     });
 
-    const signature = this.createSignature(queryParams.toString());
+    const signature = this.createSignature(queryParams.toString(), config.secretKey);
     queryParams.append('signature', signature);
 
-    const url = `${this.config.baseUrl}${endpoint}?${queryParams.toString()}`;
+    const url = `${config.baseUrl}${endpoint}?${queryParams.toString()}`;
 
     const response = await fetch(url, {
       headers: {
-        'X-MBX-APIKEY': this.config.apiKey,
+        'X-MBX-APIKEY': config.apiKey,
         'Content-Type': 'application/json'
       }
     });
@@ -127,10 +135,25 @@ export class BinanceAPI {
   // Validate API credentials
   async validateCredentials(): Promise<boolean> {
     try {
+      const config = this.getConfig();
+      
+      // Check if credentials exist
+      if (!config.apiKey || !config.secretKey) {
+        console.error('Binance API credentials not found in environment variables');
+        return false;
+      }
+
+      // Log for debugging (without exposing full credentials)
+      console.log('Validating Binance credentials...');
+      console.log('API Key length:', config.apiKey.length);
+      console.log('Secret Key length:', config.secretKey.length);
+      console.log('API Key starts with:', config.apiKey.substring(0, 10) + '...');
+
       await this.makeRequest('/api/v3/account');
+      console.log('✅ Binance API credentials validation successful');
       return true;
     } catch (error) {
-      console.error('Binance API credentials validation failed:', error);
+      console.error('❌ Binance API credentials validation failed:', error);
       return false;
     }
   }
