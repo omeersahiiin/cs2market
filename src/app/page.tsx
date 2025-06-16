@@ -28,7 +28,8 @@ interface TradingActivity {
   id: string;
   skinName: string;
   price: number;
-  type: 'BUY' | 'SELL';
+  priceChange: number;
+  priceChangePercent: number;
   timestamp: Date;
 }
 
@@ -109,14 +110,15 @@ function AnimatedBackground() {
 // Live Trading Activity Ticker
 function TradingTicker({ activities }: { activities: TradingActivity[] }) {
   return (
-    <div className="bg-[#181A20] border-y border-[#2A2D3A] py-3 overflow-hidden">
+    <div className="bg-[#181A20] border-b border-[#2A2D3A] py-3 overflow-hidden">
       <div className="flex animate-scroll-left whitespace-nowrap">
         {activities.concat(activities).map((activity, index) => (
           <div key={`${activity.id}-${index}`} className="flex items-center mx-8 text-sm">
-            <span className={`w-2 h-2 rounded-full mr-2 ${activity.type === 'BUY' ? 'bg-green-400' : 'bg-red-400'}`}></span>
+            <span className={`w-2 h-2 rounded-full mr-2 ${activity.priceChangePercent >= 0 ? 'bg-green-400' : 'bg-red-400'}`}></span>
             <span className="text-gray-300 mr-2">{activity.skinName}</span>
-            <span className={`font-semibold ${activity.type === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
-              {activity.type} ${activity.price.toLocaleString()}
+            <span className="text-gray-300 mr-2">${activity.price.toLocaleString()}</span>
+            <span className={`font-semibold ${activity.priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {activity.priceChangePercent >= 0 ? '↗' : '↘'} {activity.priceChangePercent.toFixed(2)}%
             </span>
           </div>
         ))}
@@ -233,13 +235,18 @@ export default function HomePage() {
         });
 
         // Generate mock trading activities
-        const mockActivities: TradingActivity[] = skins.slice(0, 10).map((skin, index) => ({
-          id: `activity-${index}`,
-          skinName: skin.name.length > 20 ? skin.name.substring(0, 20) + '...' : skin.name,
-          price: skin.price * (0.95 + Math.random() * 0.1), // Add some variation
-          type: Math.random() > 0.5 ? 'BUY' : 'SELL',
-          timestamp: new Date(Date.now() - Math.random() * 3600000) // Random time within last hour
-        }));
+        const mockActivities: TradingActivity[] = skins.slice(0, 10).map((skin, index) => {
+          const priceChangePercent = (Math.random() - 0.5) * 20; // -10% to +10%
+          const priceChange = skin.price * (priceChangePercent / 100);
+          return {
+            id: `activity-${index}`,
+            skinName: skin.name.length > 20 ? skin.name.substring(0, 20) + '...' : skin.name,
+            price: skin.price,
+            priceChange,
+            priceChangePercent,
+            timestamp: new Date(Date.now() - Math.random() * 3600000) // Random time within last hour
+          };
+        });
         setTradingActivities(mockActivities);
 
       } catch (error) {
@@ -263,66 +270,130 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#0F1419]">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#0F1419] via-[#1A1F2E] to-[#2A2D3A] py-20 min-h-screen flex items-center">
-        <AnimatedBackground />
-        <div className="relative container mx-auto px-4 z-10">
-          <div className="text-center max-w-4xl mx-auto">
-            <div className="mb-6 animate-fade-in-up">
-              <span className="inline-block px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium backdrop-blur-sm">
-                🚀 Professional CS2 Derivatives Trading
-              </span>
-            </div>
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-              Trade CS2 Skins
-              <span className="block bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient-x">
-                Like a Pro
-              </span>
-            </h1>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-              Advanced derivatives trading platform for CS2 skins with real-time data, 
-              professional tools, and institutional-grade security.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-              {session ? (
-                <Link
-                  href="/skins"
-                  className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 relative overflow-hidden"
-                >
-                  <span className="relative z-10">Start Trading Now</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </Link>
-              ) : (
-                <Link
-                  href="/api/auth/signin"
-                  className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 relative overflow-hidden"
-                >
-                  <span className="relative z-10">Get Started Free</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </Link>
-              )}
-              <Link
-                href="/skins"
-                className="px-8 py-4 border border-gray-600 text-gray-300 font-semibold rounded-xl hover:border-gray-500 hover:text-white transition-all duration-300 backdrop-blur-sm hover:bg-white/5"
-              >
-                Explore Market
-              </Link>
-            </div>
-          </div>
-        </div>
-        
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
-        </div>
-      </section>
-
-      {/* Live Trading Activity Ticker */}
+      {/* Live Trading Activity Ticker - Moved to top */}
       {tradingActivities.length > 0 && (
         <TradingTicker activities={tradingActivities} />
       )}
+
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#0F1419] via-[#1A1F2E] to-[#2A2D3A] py-20">
+        <AnimatedBackground />
+        <div className="relative container mx-auto px-4 z-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left side - Text content */}
+            <div className="text-center lg:text-left">
+              <div className="mb-6 animate-fade-in-up">
+                <span className="inline-block px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium backdrop-blur-sm">
+                  🚀 Professional CS2 Stock Market Trading
+                </span>
+              </div>
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+                Trade CS2 Skins
+                <span className="block bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient-x">
+                  Like a Pro
+                </span>
+              </h1>
+              <p className="text-xl text-gray-300 mb-8 leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+                Advanced stock market trading platform for CS2 skins with real-time data, 
+                professional tools, and institutional-grade security.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+                {session ? (
+                  <Link
+                    href="/skins"
+                    className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 relative overflow-hidden"
+                  >
+                    <span className="relative z-10">Start Trading Now</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/api/auth/signin"
+                    className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 relative overflow-hidden"
+                  >
+                    <span className="relative z-10">Get Started Free</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </Link>
+                )}
+                <Link
+                  href="/skins"
+                  className="px-8 py-4 border border-gray-600 text-gray-300 font-semibold rounded-xl hover:border-gray-500 hover:text-white transition-all duration-300 backdrop-blur-sm hover:bg-white/5"
+                >
+                  Explore Market
+                </Link>
+              </div>
+            </div>
+
+            {/* Right side - Top Traded Skins */}
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
+              <div className="text-center lg:text-left mb-8">
+                <h2 className="text-2xl font-bold text-white mb-2">🔥 Top Traded Skins</h2>
+                <p className="text-gray-400">Most popular skins in the market right now</p>
+              </div>
+              
+              {loading ? (
+                <div className="space-y-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-[#23262F] rounded-xl p-4 animate-pulse">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-16 h-16 bg-gray-700 rounded-lg skeleton"></div>
+                        <div className="flex-1">
+                          <div className="w-32 h-4 bg-gray-700 rounded mb-2 skeleton"></div>
+                          <div className="w-20 h-3 bg-gray-700 rounded skeleton"></div>
+                        </div>
+                        <div className="w-16 h-6 bg-gray-700 rounded skeleton"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {featuredSkins.slice(0, 4).map((skin, index) => (
+                    <Link key={skin.id} href={`/skins/${skin.id}`} className="block group">
+                      <div className="bg-[#23262F] rounded-xl p-4 border border-[#2A2D3A] hover:border-blue-500/30 transition-all duration-300 hover:bg-[#2A2D3A]">
+                        <div className="flex items-center space-x-4">
+                          <div className="relative w-16 h-16 bg-[#181A20] rounded-lg flex items-center justify-center overflow-hidden">
+                            <SteamImage
+                              iconPath={skin.iconPath}
+                              alt={skin.name}
+                              className="object-contain group-hover:scale-110 transition-transform duration-300"
+                              sizes="64px"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white font-semibold truncate group-hover:text-blue-400 transition-colors">
+                              {skin.name}
+                            </h3>
+                            <p className="text-gray-400 text-sm">{skin.type}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-green-400 font-bold">${skin.price.toLocaleString()}</div>
+                            <div className={`text-xs ${Math.random() > 0.5 ? 'text-green-400' : 'text-red-400'}`}>
+                              {Math.random() > 0.5 ? '↗' : '↘'} {(Math.random() * 10).toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              
+              <div className="mt-6 text-center lg:text-left">
+                <Link
+                  href="/skins"
+                  className="inline-flex items-center text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                >
+                  View All Skins
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Market Statistics */}
       <section className="py-16 bg-[#181A20]">
@@ -482,10 +553,10 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-white mb-4">
-              Premium Skins Collection
+              All Available Skins
             </h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Trade the most valuable and liquid CS2 skins with institutional-grade tools
+              Explore our complete collection of tradeable CS2 skins with professional tools
             </p>
           </div>
 
