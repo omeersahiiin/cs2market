@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -85,6 +85,7 @@ export default function TradePage() {
   const [selectedSkin, setSelectedSkin] = useState<Skin | null>(null);
   const [skins, setSkins] = useState<Skin[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
   const [orderForm, setOrderForm] = useState<OrderFormData>({
@@ -105,6 +106,39 @@ export default function TradePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'conditional'>('positions');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Load favorites from localStorage
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('tradingFavorites');
+    if (savedFavorites) {
+      setFavorites(JSON.parse(savedFavorites));
+    }
+  }, []);
+
+  // Save favorites to localStorage
+  useEffect(() => {
+    localStorage.setItem('tradingFavorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  // Toggle favorite
+  const toggleFavorite = (skinId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering skin selection
+    setFavorites(prev => {
+      const newFavorites = prev.includes(skinId)
+        ? prev.filter(id => id !== skinId)
+        : [...prev, skinId];
+      return newFavorites;
+    });
+  };
+
+  // Filter skins based on search and favorites
+  const filteredSkins = useMemo(() => {
+    return skins.filter((skin) => {
+      const matchesSearch = skin.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFavorites = !showFavoritesOnly || favorites.includes(skin.id);
+      return matchesSearch && matchesFavorites;
+    });
+  }, [skins, searchTerm, showFavoritesOnly, favorites]);
 
   // Fetch skins data
   useEffect(() => {
@@ -199,10 +233,6 @@ export default function TradePage() {
     fetchUserOrders();
   }, [session, refreshTrigger]);
 
-  const filteredSkins = skins.filter(skin =>
-    skin.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const handleSkinSelect = (skin: Skin) => {
     setSelectedSkin(skin);
     setOrderForm(prev => ({ 
@@ -210,14 +240,6 @@ export default function TradePage() {
       price: skin.price,
       total: skin.price * prev.quantity
     }));
-  };
-
-  const toggleFavorite = (skinId: string) => {
-    setFavorites(prev =>
-      prev.includes(skinId)
-        ? prev.filter(id => id !== skinId)
-        : [...prev, skinId]
-    );
   };
 
   const handleOrderFormChange = (field: keyof OrderFormData, value: any) => {
@@ -359,7 +381,7 @@ export default function TradePage() {
                     <p className="text-sm text-gray-400">{selectedSkin.type}</p>
                   </div>
                   <button
-                    onClick={() => toggleFavorite(selectedSkin.id)}
+                    onClick={(e) => toggleFavorite(selectedSkin.id, e)}
                     className="p-1 text-gray-400 hover:text-yellow-400 transition-colors"
                   >
                     {favorites.includes(selectedSkin.id) ? (
@@ -414,9 +436,29 @@ export default function TradePage() {
       </div>
 
       <div className="flex h-[calc(100vh-80px)]">
-        {/* Left Sidebar - Market List - DOUBLED WIDTH */}
+        {/* Left Sidebar - Market List */}
         <div className="w-96 bg-[#181A20] border-r border-[#2A2D3A] flex flex-col">
           <div className="p-4 border-b border-[#2A2D3A]">
+            <div className="flex items-center justify-between mb-3">
+              <button
+                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                  showFavoritesOnly
+                    ? 'bg-yellow-600/20 text-yellow-400 border border-yellow-500'
+                    : 'bg-[#23262F] text-gray-400 hover:text-white border border-transparent'
+                }`}
+              >
+                {showFavoritesOnly ? (
+                  <StarSolidIcon className="h-5 w-5" />
+                ) : (
+                  <StarIcon className="h-5 w-5" />
+                )}
+                <span>Favorites</span>
+              </button>
+              <div className="text-sm text-gray-400">
+                {favorites.length} saved
+              </div>
+            </div>
             <input
               type="text"
               placeholder="Search skins..."
@@ -454,7 +496,19 @@ export default function TradePage() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-white truncate text-base mb-1">{skin.name}</div>
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-white truncate text-base mb-1">{skin.name}</div>
+                        <button
+                          onClick={(e) => toggleFavorite(skin.id, e)}
+                          className="p-1 text-gray-400 hover:text-yellow-400 transition-colors"
+                        >
+                          {favorites.includes(skin.id) ? (
+                            <StarSolidIcon className="h-5 w-5 text-yellow-400" />
+                          ) : (
+                            <StarIcon className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
                       <div className="text-sm text-gray-400 mb-2">{skin.type}</div>
                       <div className="flex items-center justify-between">
                         <div className="text-xl font-bold text-white">
