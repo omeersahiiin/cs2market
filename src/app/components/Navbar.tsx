@@ -128,23 +128,25 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden border-t border-[#2A2D3A] py-4">
-            <div className="flex flex-col space-y-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={`px-4 py-2 rounded-lg transition-colors duration-200 ${
-                    isActive(link.href)
-                      ? 'bg-blue-500/20 text-blue-400'
-                      : 'text-gray-300 hover:text-white hover:bg-gray-800'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+        <div className={`md:hidden border-t border-[#2A2D3A] transition-all duration-300 ease-in-out ${
+          isMenuOpen ? 'max-h-screen opacity-100 py-4' : 'max-h-0 opacity-0 overflow-hidden'
+        }`}>
+          <div className="flex flex-col space-y-2">
+            {navLinks.map((link, index) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setIsMenuOpen(false)}
+                className={`mobile-optimized px-4 py-3 rounded-lg transition-all duration-200 transform ${
+                  isActive(link.href)
+                    ? 'bg-blue-500/20 text-blue-400 scale-105'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-800 hover:scale-105'
+                } ${isMenuOpen ? 'animate-fade-in-up' : ''}`}
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <span className="mobile-text font-medium">{link.label}</span>
+              </Link>
+            ))}
               
               {session ? (
                 <>
@@ -201,8 +203,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-          </div>
-        )}
+        </div>
       </div>
     </nav>
   );

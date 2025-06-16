@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { getSteamIconUrl, getFallbackImageUrl, getAlternativeSteamIconUrl, getAllSteamIconUrls } from '../lib/utils';
+import SwipeableSkinsCarousel from '@/components/SwipeableSkinsCarousel';
+import LazySection from '@/components/LazySection';
 
 interface Skin {
   id: string;
@@ -20,6 +22,14 @@ interface MarketStats {
   totalVolume: number;
   activeTraders: number;
   avgPrice: number;
+}
+
+interface TradingActivity {
+  id: string;
+  skinName: string;
+  price: number;
+  type: 'BUY' | 'SELL';
+  timestamp: Date;
 }
 
 // Enhanced Steam Image Component with fallback support
@@ -71,11 +81,126 @@ function SteamImage({ iconPath, alt, className, sizes }: SteamImageProps) {
   );
 }
 
+// Animated Background Particles Component
+function AnimatedBackground() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
+      {/* Floating particles */}
+      {[...Array(20)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-1 h-1 bg-blue-400/30 rounded-full animate-pulse"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            animationDuration: `${3 + Math.random() * 2}s`,
+          }}
+        />
+      ))}
+      {/* Gradient orbs */}
+      <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+    </div>
+  );
+}
+
+// Live Trading Activity Ticker
+function TradingTicker({ activities }: { activities: TradingActivity[] }) {
+  return (
+    <div className="bg-[#181A20] border-y border-[#2A2D3A] py-3 overflow-hidden">
+      <div className="flex animate-scroll-left whitespace-nowrap">
+        {activities.concat(activities).map((activity, index) => (
+          <div key={`${activity.id}-${index}`} className="flex items-center mx-8 text-sm">
+            <span className={`w-2 h-2 rounded-full mr-2 ${activity.type === 'BUY' ? 'bg-green-400' : 'bg-red-400'}`}></span>
+            <span className="text-gray-300 mr-2">{activity.skinName}</span>
+            <span className={`font-semibold ${activity.type === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
+              {activity.type} ${activity.price.toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Testimonials Component
+function TestimonialsSection() {
+  const testimonials = [
+    {
+      name: "Alex Chen",
+      role: "Professional Trader",
+      content: "The most advanced CS2 trading platform I've used. The derivatives features are game-changing.",
+      avatar: "AC",
+      rating: 5
+    },
+    {
+      name: "Sarah Johnson",
+      role: "Skin Collector",
+      content: "Finally, a platform that treats CS2 skins like real financial instruments. Love the analytics!",
+      avatar: "SJ",
+      rating: 5
+    },
+    {
+      name: "Mike Rodriguez",
+      role: "Day Trader",
+      content: "Lightning-fast execution and professional-grade tools. This is the future of skin trading.",
+      avatar: "MR",
+      rating: 5
+    }
+  ];
+
+  return (
+    <section className="py-20 bg-[#0F1419] relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5"></div>
+      <div className="container mx-auto px-4 relative">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-white mb-4">
+            Trusted by Professional Traders
+          </h2>
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            Join thousands of traders who've made the switch to professional CS2 derivatives trading
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {testimonials.map((testimonial, index) => (
+            <div
+              key={index}
+              className="bg-[#23262F] p-8 rounded-2xl border border-[#2A2D3A] hover:border-blue-500/30 transition-all duration-300 transform hover:scale-105"
+            >
+              <div className="flex items-center mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold mr-4">
+                  {testimonial.avatar}
+                </div>
+                <div>
+                  <div className="text-white font-semibold">{testimonial.name}</div>
+                  <div className="text-gray-400 text-sm">{testimonial.role}</div>
+                </div>
+              </div>
+              <div className="flex mb-4">
+                {[...Array(testimonial.rating)].map((_, i) => (
+                  <svg key={i} className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                ))}
+              </div>
+              <p className="text-gray-300 leading-relaxed">"{testimonial.content}"</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const { data: session } = useSession();
   const [featuredSkins, setFeaturedSkins] = useState<Skin[]>([]);
   const [marketStats, setMarketStats] = useState<MarketStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tradingActivities, setTradingActivities] = useState<TradingActivity[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -106,6 +231,17 @@ export default function HomePage() {
           activeTraders: 1247, // Mock data
           avgPrice
         });
+
+        // Generate mock trading activities
+        const mockActivities: TradingActivity[] = skins.slice(0, 10).map((skin, index) => ({
+          id: `activity-${index}`,
+          skinName: skin.name.length > 20 ? skin.name.substring(0, 20) + '...' : skin.name,
+          price: skin.price * (0.95 + Math.random() * 0.1), // Add some variation
+          type: Math.random() > 0.5 ? 'BUY' : 'SELL',
+          timestamp: new Date(Date.now() - Math.random() * 3600000) // Random time within last hour
+        }));
+        setTradingActivities(mockActivities);
+
       } catch (error) {
         console.error('Error fetching data:', error);
         // Set default values on error
@@ -116,6 +252,7 @@ export default function HomePage() {
           activeTraders: 0,
           avgPrice: 0
         });
+        setTradingActivities([]);
       } finally {
         setLoading(false);
       }
@@ -127,51 +264,65 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#0F1419]">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#0F1419] via-[#1A1F2E] to-[#2A2D3A] py-20">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
-        <div className="relative container mx-auto px-4">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#0F1419] via-[#1A1F2E] to-[#2A2D3A] py-20 min-h-screen flex items-center">
+        <AnimatedBackground />
+        <div className="relative container mx-auto px-4 z-10">
           <div className="text-center max-w-4xl mx-auto">
-            <div className="mb-6">
-              <span className="inline-block px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium">
+            <div className="mb-6 animate-fade-in-up">
+              <span className="inline-block px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium backdrop-blur-sm">
                 🚀 Professional CS2 Derivatives Trading
               </span>
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
               Trade CS2 Skins
-              <span className="block bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient-x">
                 Like a Pro
               </span>
             </h1>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
               Advanced derivatives trading platform for CS2 skins with real-time data, 
               professional tools, and institutional-grade security.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
               {session ? (
                 <Link
                   href="/skins"
-                  className="px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25"
+                  className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 relative overflow-hidden"
                 >
-                  Start Trading Now
+                  <span className="relative z-10">Start Trading Now</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </Link>
               ) : (
                 <Link
                   href="/api/auth/signin"
-                  className="px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25"
+                  className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 relative overflow-hidden"
                 >
-                  Get Started Free
+                  <span className="relative z-10">Get Started Free</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </Link>
               )}
               <Link
                 href="/skins"
-                className="px-8 py-4 border border-gray-600 text-gray-300 font-semibold rounded-xl hover:border-gray-500 hover:text-white transition-all duration-300"
+                className="px-8 py-4 border border-gray-600 text-gray-300 font-semibold rounded-xl hover:border-gray-500 hover:text-white transition-all duration-300 backdrop-blur-sm hover:bg-white/5"
               >
                 Explore Market
               </Link>
             </div>
           </div>
         </div>
+        
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </div>
       </section>
+
+      {/* Live Trading Activity Ticker */}
+      {tradingActivities.length > 0 && (
+        <TradingTicker activities={tradingActivities} />
+      )}
 
       {/* Market Statistics */}
       <section className="py-16 bg-[#181A20]">
@@ -187,26 +338,26 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-blue-400 mb-2">
+              <div className="text-center group">
+                <div className="text-3xl md:text-4xl font-bold text-blue-400 mb-2 group-hover:scale-110 transition-transform duration-300">
                   {marketStats?.totalSkins || 0}
                 </div>
                 <div className="text-gray-400 font-medium">Available Skins</div>
               </div>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-green-400 mb-2">
+              <div className="text-center group">
+                <div className="text-3xl md:text-4xl font-bold text-green-400 mb-2 group-hover:scale-110 transition-transform duration-300">
                   ${marketStats?.totalVolume.toLocaleString() || 0}
                 </div>
                 <div className="text-gray-400 font-medium">Total Market Value</div>
               </div>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-purple-400 mb-2">
+              <div className="text-center group">
+                <div className="text-3xl md:text-4xl font-bold text-purple-400 mb-2 group-hover:scale-110 transition-transform duration-300">
                   {marketStats?.activeTraders.toLocaleString() || 0}
                 </div>
                 <div className="text-gray-400 font-medium">Active Traders</div>
               </div>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">
+              <div className="text-center group">
+                <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-2 group-hover:scale-110 transition-transform duration-300">
                   ${marketStats?.avgPrice ? marketStats.avgPrice.toFixed(0) : '0'}
                 </div>
                 <div className="text-gray-400 font-medium">Average Price</div>
@@ -217,16 +368,37 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-[#0F1419]">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">
-              Why Choose Our Platform?
-            </h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Professional-grade tools and features designed for serious CS2 skin traders
-            </p>
+      <LazySection 
+        fallback={
+          <div className="py-20 bg-[#0F1419]">
+            <div className="container mx-auto px-4">
+              <div className="text-center mb-16">
+                <div className="w-64 h-8 bg-gray-700 rounded mx-auto mb-4 skeleton"></div>
+                <div className="w-96 h-6 bg-gray-700 rounded mx-auto skeleton"></div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="bg-[#23262F] p-8 rounded-2xl">
+                    <div className="w-12 h-12 bg-gray-700 rounded-xl mb-6 skeleton"></div>
+                    <div className="w-32 h-6 bg-gray-700 rounded mb-4 skeleton"></div>
+                    <div className="w-full h-16 bg-gray-700 rounded skeleton"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+        }
+      >
+        <section className="py-20 bg-[#0F1419]">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-white mb-4">
+                Why Choose Our Platform?
+              </h2>
+              <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+                Professional-grade tools and features designed for serious CS2 skin traders
+              </p>
+            </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             <div className="bg-[#23262F] p-8 rounded-2xl border border-[#2A2D3A] hover:border-blue-500/30 transition-all duration-300 group">
@@ -303,6 +475,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </LazySection>
 
       {/* Featured Skins Section */}
       <section className="py-20 bg-[#181A20]">
@@ -316,56 +489,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="bg-[#23262F] rounded-2xl p-6 animate-pulse">
-                  <div className="w-full h-48 bg-gray-700 rounded-xl mb-4"></div>
-                  <div className="w-3/4 h-6 bg-gray-700 rounded mb-2"></div>
-                  <div className="w-1/2 h-4 bg-gray-700 rounded"></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredSkins.map((skin) => (
-                <Link key={skin.id} href={`/skins/${skin.id}`} className="block group">
-                  <div className="bg-[#23262F] rounded-2xl overflow-hidden border border-[#2A2D3A] hover:border-blue-500/30 transition-all duration-300 transform hover:scale-105">
-                    <div className="relative w-full h-48 bg-[#181A20] flex items-center justify-center overflow-hidden">
-                      <SteamImage
-                        iconPath={skin.iconPath}
-                        alt={skin.name}
-                        className="object-contain group-hover:scale-110 transition-transform duration-300"
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                      />
-                      <div className="absolute top-4 right-4">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          skin.rarity === 'Covert' ? 'bg-red-900/30 text-red-300' :
-                          skin.rarity === 'Classified' ? 'bg-purple-900/30 text-purple-300' :
-                          skin.rarity === 'Restricted' ? 'bg-blue-900/30 text-blue-300' :
-                          skin.rarity === 'Contraband' ? 'bg-yellow-900/30 text-yellow-300' :
-                          'bg-gray-900/30 text-gray-300'
-                        }`}>
-                          {skin.rarity}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
-                        {skin.name}
-                      </h3>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400 text-sm">{skin.type}</span>
-                        <span className="text-xl font-bold text-green-400">
-                          ${skin.price.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+          <SwipeableSkinsCarousel skins={featuredSkins} loading={loading} />
 
           <div className="text-center mt-12">
             <Link
@@ -381,9 +505,40 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <LazySection 
+        fallback={
+          <div className="py-20 bg-[#0F1419]">
+            <div className="container mx-auto px-4">
+              <div className="text-center mb-16">
+                <div className="w-64 h-8 bg-gray-700 rounded mx-auto mb-4 skeleton"></div>
+                <div className="w-96 h-6 bg-gray-700 rounded mx-auto skeleton"></div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="bg-[#23262F] p-8 rounded-2xl">
+                    <div className="flex items-center mb-6">
+                      <div className="w-12 h-12 bg-gray-700 rounded-full mr-4 skeleton"></div>
+                      <div>
+                        <div className="w-24 h-4 bg-gray-700 rounded mb-2 skeleton"></div>
+                        <div className="w-20 h-3 bg-gray-700 rounded skeleton"></div>
+                      </div>
+                    </div>
+                    <div className="w-full h-20 bg-gray-700 rounded skeleton"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        }
+      >
+        <TestimonialsSection />
+      </LazySection>
+
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-700">
-        <div className="container mx-auto px-4 text-center">
+      <section className="py-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="container mx-auto px-4 text-center relative z-10">
           <h2 className="text-4xl font-bold text-white mb-6">
             Ready to Start Trading?
           </h2>
@@ -393,25 +548,31 @@ export default function HomePage() {
           {session ? (
             <Link
               href="/skins"
-              className="inline-flex items-center px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-lg"
+              className="group inline-flex items-center px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl relative overflow-hidden"
             >
-              Start Trading Now
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="relative z-10">Start Trading Now</span>
+              <svg className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </Link>
           ) : (
             <Link
               href="/api/auth/signin"
-              className="inline-flex items-center px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-lg"
+              className="group inline-flex items-center px-8 py-4 bg-white text-blue-600 font-semibold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-2xl relative overflow-hidden"
             >
-              Get Started Free
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="relative z-10">Get Started Free</span>
+              <svg className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-purple-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </Link>
           )}
         </div>
+        
+        {/* Animated background elements */}
+        <div className="absolute top-10 left-10 w-20 h-20 bg-white/10 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute bottom-10 right-10 w-32 h-32 bg-white/5 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </section>
     </div>
   );
