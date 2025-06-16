@@ -28,6 +28,9 @@ model User {
   
   // Crypto deposit relations
   cryptoDeposits CryptoDeposit[]
+  
+  // Favorites relation
+  favoriteSkins FavoriteSkin[]
 
   @@map("users")
 }
@@ -54,6 +57,9 @@ model Skin {
   imageUrl      String?
   description   String?
   trades        Trade[]
+  
+  // Favorites relation
+  favoritedBy   FavoriteSkin[]
 
   // Performance indexes for trading
   @@index([price])
@@ -270,4 +276,22 @@ model SupportedCrypto {
 
   @@index([symbol, isActive])
   @@map("supported_cryptos")
+}
+
+// Model for favorite skins
+model FavoriteSkin {
+  id        String   @id @default(cuid())
+  userId    String
+  skinId    String
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+  skin      Skin     @relation(fields: [skinId], references: [id])
+  
+  // Ensure a user can't favorite the same skin twice
+  @@unique([userId, skinId])
+  @@index([userId])
+  @@index([skinId])
+  @@map("favorite_skins")
 }
