@@ -7,6 +7,9 @@ import { useSession } from 'next-auth/react';
 import { getSteamIconUrl, getFallbackImageUrl, getAlternativeSteamIconUrl, getAllSteamIconUrls } from '../lib/utils';
 import SwipeableSkinsCarousel from '@/components/SwipeableSkinsCarousel';
 import LazySection from '@/components/LazySection';
+import { SteamImage } from '@/components/SteamImage';
+import GunTypeFilter from '@/components/GunTypeFilter';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface Skin {
   id: string;
@@ -32,55 +35,6 @@ interface TradingActivity {
   priceChange: number;
   priceChangePercent: number;
   timestamp: Date;
-}
-
-// Enhanced Steam Image Component with fallback support
-interface SteamImageProps {
-  iconPath: string;
-  alt: string;
-  className?: string;
-  sizes?: string;
-}
-
-function SteamImage({ iconPath, alt, className, sizes }: SteamImageProps) {
-  const [currentSrc, setCurrentSrc] = useState(getSteamIconUrl(iconPath));
-  const [hasError, setHasError] = useState(false);
-  const [fallbackIndex, setFallbackIndex] = useState(0);
-
-  const fallbackUrls = getAllSteamIconUrls(iconPath);
-
-  const handleError = () => {
-    console.log('Image failed to load:', currentSrc);
-    
-    if (fallbackIndex < fallbackUrls.length - 1) {
-      const nextIndex = fallbackIndex + 1;
-      setFallbackIndex(nextIndex);
-      setCurrentSrc(fallbackUrls[nextIndex]);
-      console.log('Trying fallback URL:', fallbackUrls[nextIndex]);
-    } else {
-      console.log('All Steam URLs failed, using final fallback');
-      setCurrentSrc(getFallbackImageUrl());
-      setHasError(true);
-    }
-  };
-
-  const handleLoad = () => {
-    console.log('Image loaded successfully:', currentSrc);
-    setHasError(false);
-  };
-
-  return (
-    <Image
-      src={currentSrc}
-      alt={alt}
-      fill
-      className={className}
-      sizes={sizes}
-      onError={handleError}
-      onLoad={handleLoad}
-      priority={false}
-    />
-  );
 }
 
 // Animated Background Particles Component
@@ -204,6 +158,8 @@ export default function HomePage() {
   const [marketStats, setMarketStats] = useState<MarketStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [tradingActivities, setTradingActivities] = useState<TradingActivity[]>([]);
+  const [selectedGunType, setSelectedGunType] = useState('All');
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -251,6 +207,13 @@ export default function HomePage() {
         });
         setTradingActivities(mockActivities);
 
+        // Fetch user's favorites if logged in
+        if (session) {
+          const favoritesResponse = await fetch('/api/favorites');
+          const favoritesData = await favoritesResponse.json();
+          setFavorites(favoritesData.favorites.map((f: any) => f.skinId));
+        }
+
       } catch (error) {
         console.error('Error fetching data:', error);
         // Set default values on error
@@ -268,7 +231,12 @@ export default function HomePage() {
     };
 
     fetchData();
-  }, []);
+  }, [session]);
+
+  // Filter skins by gun type
+  const filteredSkins = selectedGunType === 'All'
+    ? featuredSkins
+    : featuredSkins.filter(skin => skin.type === selectedGunType);
 
   return (
     <div className="min-h-screen bg-[#0F1419]">
@@ -332,6 +300,9 @@ export default function HomePage() {
                 <h2 className="text-2xl font-bold text-white mb-2">🔥 Top Traded Skins</h2>
                 <p className="text-gray-400">Most liquid skins with highest trading volume</p>
               </div>
+
+              {/* Gun Type Filter */}
+              <GunTypeFilter selectedType={selectedGunType} onTypeChange={setSelectedGunType} />
               
               {loading ? (
                 <div className="space-y-4">
@@ -350,7 +321,7 @@ export default function HomePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {featuredSkins.slice(0, 4).map((skin, index) => (
+                  {filteredSkins.slice(0, 4).map((skin, index) => (
                     <Link key={skin.id} href={`/skins/${skin.id}`} className="block group">
                       <div className="bg-[#23262F] rounded-xl p-4 border border-[#2A2D3A] hover:border-blue-500/30 transition-all duration-300 hover:bg-[#2A2D3A]">
                         <div className="flex items-center space-x-4">
@@ -374,6 +345,17 @@ export default function HomePage() {
                               {Math.random() > 0.5 ? '↗' : '↘'} {(Math.random() * 10).toFixed(1)}%
                             </div>
                           </div>
+                          <FavoriteButton
+                            skinId={skin.id}
+                            initialFavorited={favorites.includes(skin.id)}
+                            onToggle={(isFavorited) => {
+                              setFavorites(prev =>
+                                isFavorited
+                                  ? [...prev, skin.id]
+                                  : prev.filter(id => id !== skin.id)
+                              );
+                            }}
+                          />
                         </div>
                       </div>
                     </Link>
@@ -381,7 +363,7 @@ export default function HomePage() {
                 </div>
               )}
               
-              <div className="mt-6 text-center lg:text-left">
+              <div className="mt-6 text-center lg:text-left flex items-center justify-between">
                 <Link
                   href="/skins"
                   className="inline-flex items-center text-blue-400 hover:text-blue-300 transition-colors font-medium"
@@ -391,6 +373,17 @@ export default function HomePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
                 </Link>
+                {session && (
+                  <Link
+                    href="/favorites"
+                    className="inline-flex items-center text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                  >
+                    View Favorites
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
