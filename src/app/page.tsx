@@ -15,6 +15,7 @@ interface Skin {
   iconPath: string;
   type: string;
   rarity: string;
+  volume24h?: number;
 }
 
 interface MarketStats {
@@ -219,8 +220,9 @@ export default function HomePage() {
           throw new Error('Invalid skins data format');
         }
         
+        // Sort by volume24h to get most liquid skins (most orders/trading activity)
         const topSkins = skins
-          .sort((a: Skin, b: Skin) => b.price - a.price)
+          .sort((a: Skin, b: Skin) => (b.volume24h || 0) - (a.volume24h || 0))
           .slice(0, 6);
         setFeaturedSkins(topSkins);
 
@@ -300,7 +302,7 @@ export default function HomePage() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
                 {session ? (
                   <Link
-                    href="/skins"
+                    href="/trade"
                     className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-blue-500/25 relative overflow-hidden"
                   >
                     <span className="relative z-10">Start Trading Now</span>
@@ -328,7 +330,7 @@ export default function HomePage() {
             <div className="animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
               <div className="text-center lg:text-left mb-8">
                 <h2 className="text-2xl font-bold text-white mb-2">🔥 Top Traded Skins</h2>
-                <p className="text-gray-400">Most popular skins in the market right now</p>
+                <p className="text-gray-400">Most liquid skins with highest trading volume</p>
               </div>
               
               {loading ? (
