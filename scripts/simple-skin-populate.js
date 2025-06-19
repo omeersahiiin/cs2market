@@ -8,6 +8,7 @@ const prisma = new PrismaClient();
 const getWeaponType = (skinName) => {
   const name = skinName.toLowerCase();
   
+  // AWP is always a Sniper Rifle, not Rifle
   if (name.includes('awp')) return 'Sniper Rifle';
   if (name.includes('ak-47') || name.includes('m4a4') || name.includes('m4a1-s') || name.includes('galil')) return 'Rifle';
   if (name.includes('glock') || name.includes('desert eagle') || name.includes('usp')) return 'Pistol';
@@ -15,6 +16,12 @@ const getWeaponType = (skinName) => {
   if (name.includes('bayonet') || name.includes('karambit')) return 'Knife';
   
   return 'Unknown';
+};
+
+// Clean skin name to avoid duplicates (remove pipe separators)
+const cleanSkinName = (name) => {
+  // Remove " | " and everything after it, then trim
+  return name.replace(/\s*\|\s*.*/, '').trim();
 };
 
 // Map skin rarity based on typical patterns and names
@@ -153,15 +160,17 @@ async function parseSkinData() {
   const skins = [];
   
   for (const line of lines) {
-    const [skinName, imageUrl] = line.split(':https://');
-    if (skinName && imageUrl) {
+    const [rawSkinName, imageUrl] = line.split(':https://');
+    if (rawSkinName && imageUrl) {
+      // Clean the skin name to avoid duplicates (remove pipe separators)
+      const skinName = cleanSkinName(rawSkinName.trim());
       const fullImageUrl = 'https://' + imageUrl.trim();
       const type = getWeaponType(skinName);
       const rarity = getSkinRarity(skinName);
       const price = generatePrice(skinName, rarity);
       
       skins.push({
-        name: skinName.trim(),
+        name: skinName,
         type: type,
         rarity: rarity,
         price: price,
@@ -170,7 +179,7 @@ async function parseSkinData() {
         wear: 'Factory New',
         minFloat: 0.0,
         maxFloat: 1.0,
-        description: `Premium CS2 skin: ${skinName.trim()}`,
+        description: `Premium CS2 skin: ${skinName}`,
       });
     }
   }
