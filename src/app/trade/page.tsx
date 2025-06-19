@@ -435,7 +435,7 @@ export default function TradePage() {
                       : 'bg-[#23262F] hover:bg-[#2A2D3A] border border-transparent'
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 relative">
                     <div className="w-12 h-12 bg-[#181A20] rounded-lg p-2 flex-shrink-0">
                       <Image
                         src={formatSteamImageUrl(skin.iconPath)}
@@ -451,19 +451,36 @@ export default function TradePage() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-white truncate text-base mb-1">{skin.name}</div>
-                      <div className="text-sm text-gray-400 mb-2">{skin.type}</div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-xl font-bold text-white">
-                          ${skin.price.toLocaleString()}
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-white truncate text-base mb-1">{skin.name}</div>
+                          <div className="text-sm text-gray-400 mb-2">{skin.type}</div>
+                          <div className="flex items-center justify-between">
+                            <div className="text-xl font-bold text-white">
+                              ${skin.price.toLocaleString()}
+                            </div>
+                            <div className={`text-base font-semibold px-2 py-1 rounded ${
+                              (skin.priceChangePercent || 0) >= 0 
+                                ? 'text-green-400 bg-green-900/20' 
+                                : 'text-red-400 bg-red-900/20'
+                            }`}>
+                              {(skin.priceChangePercent || 0) >= 0 ? '+' : ''}{(skin.priceChangePercent || 0).toFixed(2)}%
+                            </div>
+                          </div>
                         </div>
-                        <div className={`text-base font-semibold px-2 py-1 rounded ${
-                          (skin.priceChangePercent || 0) >= 0 
-                            ? 'text-green-400 bg-green-900/20' 
-                            : 'text-red-400 bg-red-900/20'
-                        }`}>
-                          {(skin.priceChangePercent || 0) >= 0 ? '+' : ''}{(skin.priceChangePercent || 0).toFixed(2)}%
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(skin.id);
+                          }}
+                          className="ml-2 p-1 text-gray-400 hover:text-yellow-400 transition-colors"
+                        >
+                          {isFavorite(skin.id) ? (
+                            <StarSolidIcon className="h-5 w-5 text-yellow-400" />
+                          ) : (
+                            <StarIcon className="h-5 w-5" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>
