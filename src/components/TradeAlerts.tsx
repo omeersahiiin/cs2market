@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BellIcon, 
@@ -14,6 +15,7 @@ import {
   ClockIcon,
   FireIcon
 } from '@heroicons/react/24/outline';
+import { formatSteamImageUrl, getFallbackImageUrl } from '../lib/utils';
 
 interface Alert {
   id: string;
@@ -364,10 +366,17 @@ export default function TradeAlerts({ isOpen, onClose }: TradeAlertsProps) {
 
                           {/* Skin Image */}
                           <div className="w-16 h-16 bg-[#181A20] rounded-lg p-2 flex-shrink-0">
-                            <img
-                              src={alert.skinImage}
+                            <Image
+                              src={formatSteamImageUrl(alert.skinImage)}
                               alt={alert.skinName}
+                              width={64}
+                              height={64}
                               className="w-full h-full object-contain"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = getFallbackImageUrl();
+                              }}
+                              unoptimized
                             />
                           </div>
 

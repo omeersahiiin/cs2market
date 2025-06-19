@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { XMarkIcon, HeartIcon, BellIcon, ShareIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon, BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
+import { formatSteamImageUrl, getFallbackImageUrl } from '../lib/utils';
 
 interface WishlistItem {
   id: string;
@@ -316,10 +318,17 @@ export default function WishlistManager({ isOpen, onClose }: WishlistManagerProp
                   <div className="flex items-center space-x-4">
                     {/* Item Image */}
                     <div className="w-20 h-20 bg-[#181A20] rounded-lg p-2 flex-shrink-0">
-                      <img
-                        src={item.image}
+                      <Image
+                        src={formatSteamImageUrl(item.image)}
                         alt={item.name}
+                        width={80}
+                        height={80}
                         className="w-full h-full object-contain"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = getFallbackImageUrl();
+                        }}
+                        unoptimized
                       />
                     </div>
 
