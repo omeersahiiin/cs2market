@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowTrendingUpIcon, 
@@ -14,6 +16,27 @@ import {
   ArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { formatSteamImageUrl, getFallbackImageUrl } from '../lib/utils';
+
+interface Position {
+  id: string;
+  type: 'LONG' | 'SHORT';
+  entryPrice: number;
+  exitPrice?: number;
+  size: number;
+  margin: number;
+  closedAt: string | null;
+  createdAt: string;
+  skin: {
+    id: string;
+    name: string;
+    price: number;
+    iconPath: string;
+    rarity?: string;
+    wear?: string;
+    category?: string;
+  };
+}
 
 interface PortfolioItem {
   id: string;
@@ -28,6 +51,7 @@ interface PortfolioItem {
   purchaseDate: string;
   category: string;
   collection?: string;
+  type: 'LONG' | 'SHORT';
 }
 
 interface PortfolioStats {
@@ -61,92 +85,115 @@ const rarityColors = {
 const COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#EF4444', '#F97316', '#10B981', '#F59E0B'];
 
 export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerProps) {
+  const { data: session } = useSession();
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [stats, setStats] = useState<PortfolioStats | null>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1D' | '1W' | '1M' | '3M' | '1Y'>('1M');
   const [viewMode, setViewMode] = useState<'overview' | 'holdings' | 'analytics'>('overview');
   const [sortBy, setSortBy] = useState<'value' | 'pnl' | 'pnlPercent' | 'name'>('value');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock portfolio data
+  // Fetch real user positions data
   useEffect(() => {
-    const mockPortfolio: PortfolioItem[] = [
-      {
-        id: '1',
-        skinId: 'awp-dragon-lore',
-        name: 'AWP | Dragon Lore',
-        image: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot621FAR17PLfYQJD_9W7m5a0mvLwOq7c2D4G65Vy07-Uo9-g2wXj-UVpYmGhJoKRdlQ5aFnT-gC9xOjxxcjrJJJJJA',
-        rarity: 'Contraband',
-        wear: 'Field-Tested',
-        purchasePrice: 11500,
-        currentPrice: 12500,
-        quantity: 1,
-        purchaseDate: '2024-01-15',
-        category: 'Sniper',
-        collection: 'Cobblestone Collection'
-      },
-      {
-        id: '2',
-        skinId: 'ak47-wild-lotus',
-        name: 'AK-47 | Wild Lotus',
-        image: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpot7HxfDhjxszJemkV09-5lpKKqPrxN7LEmyUJ6ZYg2LiSrN6t2wDi-UNpZGGhJoKRdlQ5aFnT-gC9xOjxxcjrJJJJJA',
-        rarity: 'Covert',
-        wear: 'Minimal Wear',
-        purchasePrice: 8200,
-        currentPrice: 8500,
-        quantity: 1,
-        purchaseDate: '2024-01-20',
-        category: 'Rifle',
-        collection: 'Dreams & Nightmares Collection'
-      },
-      {
-        id: '3',
-        skinId: 'karambit-fade',
-        name: 'Karambit | Fade',
-        image: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf3qr3czxb49KzgL-KmsjwPKvBmm5D19V5i_rVyoD8j1yg5UdpZjz7cNKVdlI2aV_V_1K6wOjxxcjrJJJJJA',
-        rarity: 'Covert',
-        wear: 'Factory New',
-        purchasePrice: 2650,
-        currentPrice: 2850,
-        quantity: 1,
-        purchaseDate: '2024-01-25',
-        category: 'Knife',
-        collection: 'Chroma Collection'
-      },
-      {
-        id: '4',
-        skinId: 'glock-fade',
-        name: 'Glock-18 | Fade',
-        image: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgposbaqKAxf0Ob3djFN79eJmIWPnuL5fevVwW4IuJIkjLiQ8d2t2wDi-UNpZGGhJoKRdlQ5aFnT-gC9xOjxxcjrJJJJJA',
-        rarity: 'Restricted',
-        wear: 'Factory New',
-        purchasePrice: 420,
-        currentPrice: 380,
-        quantity: 2,
-        purchaseDate: '2024-02-01',
-        category: 'Pistol',
-        collection: 'Chroma Collection'
+    const fetchPositions = async () => {
+      if (!session?.user) {
+        setIsLoading(false);
+        return;
       }
-    ];
 
-    setPortfolioItems(mockPortfolio);
-  }, []);
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/positions');
+        if (!response.ok) {
+          throw new Error('Failed to fetch positions');
+        }
+
+        const positionsData: Position[] = await response.json();
+        setPositions(positionsData);
+
+        // Convert positions to portfolio items format
+        const portfolioItems: PortfolioItem[] = positionsData.map(position => ({
+          id: position.id,
+          skinId: position.skin.id,
+          name: position.skin.name,
+          image: position.skin.iconPath,
+          rarity: position.skin.rarity || 'Unknown',
+          wear: position.skin.wear || 'Unknown',
+          purchasePrice: position.entryPrice,
+          currentPrice: position.skin.price,
+          quantity: position.size,
+          purchaseDate: position.createdAt,
+          category: position.skin.category || 'Unknown',
+          type: position.type
+        }));
+
+        setPortfolioItems(portfolioItems);
+      } catch (error) {
+        console.error('Error fetching positions:', error);
+        setError(error instanceof Error ? error.message : 'Failed to load portfolio data');
+        setPortfolioItems([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchPositions();
+    }
+  }, [session, isOpen]);
 
   // Calculate portfolio statistics
   useEffect(() => {
-    if (portfolioItems.length === 0) return;
+    if (portfolioItems.length === 0) {
+      setStats(null);
+      return;
+    }
 
-    const totalValue = portfolioItems.reduce((sum, item) => sum + (item.currentPrice * item.quantity), 0);
+    const totalValue = portfolioItems.reduce((sum, item) => {
+      // For LONG positions: current value = current price * quantity
+      // For SHORT positions: current value = entry price + (entry price - current price) * quantity
+      if (item.type === 'LONG') {
+        return sum + (item.currentPrice * item.quantity);
+      } else {
+        // SHORT position value
+        const pnl = (item.purchasePrice - item.currentPrice) * item.quantity;
+        return sum + (item.purchasePrice * item.quantity) + pnl;
+      }
+    }, 0);
+
     const totalInvested = portfolioItems.reduce((sum, item) => sum + (item.purchasePrice * item.quantity), 0);
-    const totalPnL = totalValue - totalInvested;
-    const totalPnLPercentage = ((totalPnL / totalInvested) * 100);
+    
+    // Calculate P&L correctly for LONG and SHORT positions
+    const totalPnL = portfolioItems.reduce((sum, item) => {
+      if (item.type === 'LONG') {
+        return sum + ((item.currentPrice - item.purchasePrice) * item.quantity);
+      } else {
+        return sum + ((item.purchasePrice - item.currentPrice) * item.quantity);
+      }
+    }, 0);
+
+    const totalPnLPercentage = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
 
     // Find best and worst performers
-    const itemsWithPnL = portfolioItems.map(item => ({
-      ...item,
-      pnl: (item.currentPrice - item.purchasePrice) * item.quantity,
-      pnlPercent: ((item.currentPrice - item.purchasePrice) / item.purchasePrice) * 100
-    }));
+    const itemsWithPnL = portfolioItems.map(item => {
+      let pnl: number;
+      let pnlPercent: number;
+
+      if (item.type === 'LONG') {
+        pnl = (item.currentPrice - item.purchasePrice) * item.quantity;
+        pnlPercent = ((item.currentPrice - item.purchasePrice) / item.purchasePrice) * 100;
+      } else {
+        pnl = (item.purchasePrice - item.currentPrice) * item.quantity;
+        pnlPercent = ((item.purchasePrice - item.currentPrice) / item.purchasePrice) * 100;
+      }
+
+      return { ...item, pnl, pnlPercent };
+    });
 
     const bestPerformer = itemsWithPnL.reduce((best, item) => 
       item.pnlPercent > best.pnlPercent ? item : best
@@ -159,7 +206,9 @@ export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerPr
     // Category breakdown
     const categoryBreakdown: { [key: string]: number } = {};
     portfolioItems.forEach(item => {
-      const value = item.currentPrice * item.quantity;
+      const value = item.type === 'LONG' 
+        ? item.currentPrice * item.quantity
+        : (item.purchasePrice * item.quantity) + ((item.purchasePrice - item.currentPrice) * item.quantity);
       categoryBreakdown[item.category] = (categoryBreakdown[item.category] || 0) + value;
     });
 
@@ -171,9 +220,9 @@ export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerPr
       bestPerformer,
       worstPerformer,
       categoryBreakdown,
-      dailyPnL: totalPnL * 0.02, // Mock daily change
+      dailyPnL: totalPnL * 0.02, // Mock daily change - could be calculated from historical data
       weeklyPnL: totalPnL * 0.15, // Mock weekly change
-      monthlyPnL: totalPnL // Mock monthly change
+      monthlyPnL: totalPnL // Current total PnL as monthly
     });
   }, [portfolioItems]);
 
@@ -264,7 +313,23 @@ export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerPr
           </div>
 
           {/* Overview Tab */}
-          {viewMode === 'overview' && stats && (
+          {viewMode === 'overview' && (
+            isLoading ? (
+              <div className="text-center py-8">
+                <div className="text-white text-lg">Loading portfolio overview...</div>
+                <div className="text-gray-400 text-sm mt-2">Fetching your positions and calculating statistics</div>
+              </div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <div className="text-red-400 text-lg">{error}</div>
+                <div className="text-gray-400 text-sm mt-2">Unable to load portfolio data</div>
+              </div>
+            ) : portfolioItems.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-400 text-lg">No positions to display</div>
+                <div className="text-gray-500 text-sm mt-2">Start trading to see your portfolio statistics</div>
+              </div>
+            ) : stats && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -400,6 +465,7 @@ export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerPr
                 </div>
               </div>
             </motion.div>
+            )
           )}
 
           {/* Holdings Tab */}
@@ -409,31 +475,53 @@ export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerPr
               animate={{ opacity: 1, y: 0 }}
               className="space-y-4"
             >
-              {/* Sort Controls */}
-              <div className="flex items-center space-x-4 mb-6">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="px-3 py-2 bg-[#23262F] border border-[#2A2D3A] rounded-lg text-white focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="value">Sort by Value</option>
-                  <option value="pnl">Sort by P&L</option>
-                  <option value="pnlPercent">Sort by P&L %</option>
-                  <option value="name">Sort by Name</option>
-                </select>
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  className="px-3 py-2 bg-[#23262F] border border-[#2A2D3A] rounded-lg text-white hover:bg-[#2A2D3A] transition-colors"
-                >
-                  {sortOrder === 'desc' ? '↓' : '↑'}
-                </button>
-              </div>
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="text-white text-lg">Loading portfolio...</div>
+                  <div className="text-gray-400 text-sm mt-2">Fetching your positions and calculating P&L</div>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <div className="text-red-400 text-lg">{error}</div>
+                  <div className="text-gray-400 text-sm mt-2">Please try again later</div>
+                </div>
+              ) : portfolioItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-400 text-lg">No positions found</div>
+                  <div className="text-gray-500 text-sm mt-2">Start trading to see your portfolio here</div>
+                </div>
+              ) : (
+                <>
+                  {/* Sort Controls */}
+                  <div className="flex items-center space-x-4 mb-6">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as any)}
+                      className="px-3 py-2 bg-[#23262F] border border-[#2A2D3A] rounded-lg text-white focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="value">Sort by Value</option>
+                      <option value="pnl">Sort by P&L</option>
+                      <option value="pnlPercent">Sort by P&L %</option>
+                      <option value="name">Sort by Name</option>
+                    </select>
+                    <button
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                      className="px-3 py-2 bg-[#23262F] border border-[#2A2D3A] rounded-lg text-white hover:bg-[#2A2D3A] transition-colors"
+                    >
+                      {sortOrder === 'desc' ? '↓' : '↑'}
+                    </button>
+                  </div>
 
-              {/* Holdings List */}
-              <div className="space-y-3">
-                {sortedItems.map((item, index) => {
-                  const pnl = (item.currentPrice - item.purchasePrice) * item.quantity;
-                  const pnlPercent = ((item.currentPrice - item.purchasePrice) / item.purchasePrice) * 100;
+                  {/* Holdings List */}
+                  <div className="space-y-3">
+                    {sortedItems.map((item, index) => {
+                      // Calculate P&L correctly for LONG and SHORT positions
+                      const pnl = item.type === 'LONG'
+                        ? (item.currentPrice - item.purchasePrice) * item.quantity
+                        : (item.purchasePrice - item.currentPrice) * item.quantity;
+                      const pnlPercent = item.type === 'LONG'
+                        ? ((item.currentPrice - item.purchasePrice) / item.purchasePrice) * 100
+                        : ((item.purchasePrice - item.currentPrice) / item.purchasePrice) * 100;
                   
                   return (
                     <motion.div
@@ -447,10 +535,17 @@ export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerPr
                       <div className="flex items-center space-x-4">
                         {/* Skin Image */}
                         <div className="w-16 h-16 bg-[#181A20] rounded-lg p-2 flex-shrink-0">
-                          <img
-                            src={item.image}
+                          <Image
+                            src={formatSteamImageUrl(item.image)}
                             alt={item.name}
+                            width={64}
+                            height={64}
                             className="w-full h-full object-contain"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = getFallbackImageUrl();
+                            }}
+                            unoptimized
                           />
                         </div>
 
@@ -499,8 +594,10 @@ export default function PortfolioTracker({ isOpen, onClose }: PortfolioTrackerPr
                       </div>
                     </motion.div>
                   );
-                })}
-              </div>
+                    })}
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
 
