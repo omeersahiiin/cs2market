@@ -28,7 +28,7 @@ model User {
   
   // Crypto deposit relations
   cryptoDeposits CryptoDeposit[]
-  
+
   // Favorites relation
   favoriteSkins FavoriteSkin[]
 
