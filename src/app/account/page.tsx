@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface UserStats {
@@ -22,103 +22,132 @@ interface Transaction {
   skinName?: string;
 }
 
+interface DashboardData {
+  balance: number;
+  stats: UserStats;
+  recentTransactions: Transaction[];
+}
+
 export default function AccountPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'settings'>('overview');
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Memoize session redirect check to prevent unnecessary re-renders
+  const shouldRedirect = useMemo(() => {
+    return status === 'unauthenticated';
+  }, [status]);
+
+  // Handle redirect only when necessary
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (shouldRedirect) {
       router.push('/auth/signin');
-      return;
     }
+  }, [shouldRedirect, router]);
 
-    if (session) {
-      fetchAccountData();
-    }
-  }, [session, status, router]);
-
-  const fetchAccountData = async () => {
+  // Fetch dashboard data (optimized single API call)
+  const fetchDashboardData = useCallback(async () => {
+    if (!session?.user?.email) return;
+    
     try {
       setIsLoading(true);
+      setError(null);
       
-      // Fetch balance
-      const balanceRes = await fetch('/api/user/balance');
-      if (balanceRes.ok) {
-        const balanceData = await balanceRes.json();
-        setBalance(balanceData.balance);
+      const response = await fetch('/api/user/dashboard', {
+        cache: 'no-store', // Prevent caching issues
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-
-      // Fetch real user stats
-      const statsRes = await fetch('/api/user/stats');
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      } else {
-        // Fallback to default stats if API fails
-        setStats({
+      
+      const data: DashboardData = await response.json();
+      setDashboardData(data);
+      
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load account data');
+      
+      // Set fallback data to prevent blank page
+      setDashboardData({
+        balance: 0,
+        stats: {
           totalTrades: 0,
           totalVolume: 0,
           totalPnL: 0,
           winRate: 0,
           openPositions: 0,
           openOrders: 0
-        });
-      }
-
-      // Fetch real transaction history
-      const transactionsRes = await fetch('/api/user/transactions');
-      if (transactionsRes.ok) {
-        const transactionsData = await transactionsRes.json();
-        setTransactions(transactionsData.transactions || []);
-      } else {
-        // Fallback to empty transactions if API fails
-        setTransactions([]);
-      }
-
-    } catch (error) {
-      console.error('Error fetching account data:', error);
-      // Set fallback data on error
-      setStats({
-        totalTrades: 0,
-        totalVolume: 0,
-        totalPnL: 0,
-        winRate: 0,
-        openPositions: 0,
-        openOrders: 0
+        },
+        recentTransactions: []
       });
-      setTransactions([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.email]);
 
-  if (status === 'loading' || isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
-        <div className="text-white">Loading...</div>
-      </div>
-    );
-  }
+  // Fetch full transaction history (only when transactions tab is active)
+  const fetchAllTransactions = useCallback(async () => {
+    if (!session?.user?.email) return;
+    
+    try {
+      setIsLoadingTransactions(true);
+      
+      const response = await fetch('/api/user/transactions', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAllTransactions(data.transactions || []);
+      } else {
+        console.warn('Failed to fetch full transaction history');
+        setAllTransactions(dashboardData?.recentTransactions || []);
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setAllTransactions(dashboardData?.recentTransactions || []);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [session?.user?.email, dashboardData?.recentTransactions]);
 
-  if (!session) {
-    return null;
-  }
+  // Initial data fetch when session is ready
+  useEffect(() => {
+    if (session?.user?.email && !shouldRedirect) {
+      fetchDashboardData();
+    }
+  }, [session?.user?.email, shouldRedirect, fetchDashboardData]);
 
-  const formatCurrency = (amount: number) => {
+  // Fetch full transactions only when switching to transactions tab
+  useEffect(() => {
+    if (activeTab === 'transactions' && allTransactions.length === 0 && dashboardData) {
+      fetchAllTransactions();
+    }
+  }, [activeTab, allTransactions.length, dashboardData, fetchAllTransactions]);
+
+  // Memoize format functions to prevent re-renders
+  const formatCurrency = useCallback((amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -126,15 +155,66 @@ export default function AccountPage() {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
+  }, []);
+
+  // Loading state
+  if (status === 'loading' || isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="text-white">Loading account data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if redirecting
+  if (shouldRedirect || !session) {
+    return null;
+  }
+
+  // Error state
+  if (error && !dashboardData) {
+    return (
+      <div className="min-h-screen bg-[#0F1419] flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-red-400 text-xl mb-4">Failed to Load Account</div>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <button 
+            onClick={fetchDashboardData}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0F1419] py-8">
       <div className="container mx-auto px-4 max-w-6xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Account</h1>
-          <p className="text-gray-400">Manage your account and view trading activity</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Account</h1>
+              <p className="text-gray-400">Manage your account and view trading activity</p>
+            </div>
+            {error && (
+              <div className="flex items-center space-x-2 text-yellow-400 text-sm">
+                <span>⚠️</span>
+                <span>Some data may be outdated</span>
+                <button 
+                  onClick={fetchDashboardData}
+                  className="text-blue-400 hover:text-blue-300 underline ml-2"
+                >
+                  Refresh
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Account Summary Card */}
@@ -157,7 +237,7 @@ export default function AccountPage() {
             <div>
               <h3 className="text-lg font-semibold text-white mb-4">Balance</h3>
               <div className="text-3xl font-bold text-green-400">
-                {balance !== null ? formatCurrency(balance) : '...'}
+                {dashboardData ? formatCurrency(dashboardData.balance) : '...'}
               </div>
               <p className="text-gray-400 text-sm mt-1">Available for trading</p>
             </div>
@@ -201,36 +281,36 @@ export default function AccountPage() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'overview' && stats && (
+        {activeTab === 'overview' && dashboardData && (
           <div className="space-y-6">
             {/* Trading Stats */}
             <div className="bg-[#23262F] rounded-2xl p-6 border border-[#2A2D3A]">
               <h3 className="text-xl font-semibold text-white mb-6">Trading Statistics</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{stats.totalTrades}</div>
+                  <div className="text-2xl font-bold text-white">{dashboardData.stats.totalTrades}</div>
                   <div className="text-gray-400 text-sm">Total Trades</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{formatCurrency(stats.totalVolume)}</div>
+                  <div className="text-2xl font-bold text-white">{formatCurrency(dashboardData.stats.totalVolume)}</div>
                   <div className="text-gray-400 text-sm">Total Volume</div>
                 </div>
                 <div className="text-center">
-                  <div className={`text-2xl font-bold ${stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {stats.totalPnL >= 0 ? '+' : ''}{formatCurrency(stats.totalPnL)}
+                  <div className={`text-2xl font-bold ${dashboardData.stats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {dashboardData.stats.totalPnL >= 0 ? '+' : ''}{formatCurrency(dashboardData.stats.totalPnL)}
                   </div>
                   <div className="text-gray-400 text-sm">Total P&L</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-400">{stats.winRate}%</div>
+                  <div className="text-2xl font-bold text-blue-400">{dashboardData.stats.winRate}%</div>
                   <div className="text-gray-400 text-sm">Win Rate</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-400">{stats.openPositions}</div>
+                  <div className="text-2xl font-bold text-yellow-400">{dashboardData.stats.openPositions}</div>
                   <div className="text-gray-400 text-sm">Open Positions</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-400">{stats.openOrders}</div>
+                  <div className="text-2xl font-bold text-purple-400">{dashboardData.stats.openOrders}</div>
                   <div className="text-gray-400 text-sm">Open Orders</div>
                 </div>
               </div>
@@ -240,7 +320,7 @@ export default function AccountPage() {
             <div className="bg-[#23262F] rounded-2xl p-6 border border-[#2A2D3A]">
               <h3 className="text-xl font-semibold text-white mb-6">Recent Activity</h3>
               <div className="space-y-4">
-                {transactions.slice(0, 5).map((transaction) => (
+                {dashboardData.recentTransactions.slice(0, 8).map((transaction) => (
                   <div key={transaction.id} className="flex items-center justify-between py-3 border-b border-[#2A2D3A] last:border-b-0">
                     <div className="flex items-center space-x-3">
                       <div className={`w-2 h-2 rounded-full ${
@@ -269,7 +349,15 @@ export default function AccountPage() {
 
         {activeTab === 'transactions' && (
           <div className="bg-[#23262F] rounded-2xl p-6 border border-[#2A2D3A]">
-            <h3 className="text-xl font-semibold text-white mb-6">Transaction History</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-white">Transaction History</h3>
+              {isLoadingTransactions && (
+                <div className="flex items-center space-x-2 text-gray-400">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                  <span className="text-sm">Loading...</span>
+                </div>
+              )}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -281,7 +369,7 @@ export default function AccountPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((transaction) => (
+                  {(allTransactions.length > 0 ? allTransactions : dashboardData?.recentTransactions || []).map((transaction) => (
                     <tr key={transaction.id} className="border-b border-[#2A2D3A] hover:bg-[#1A1C23]">
                       <td className="py-3 px-2 text-gray-300">{formatDate(transaction.createdAt)}</td>
                       <td className="py-3 px-2">
