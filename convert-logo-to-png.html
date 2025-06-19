@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logo to PNG Converter</title>
+    <style>
+        body {
+            background: #0F1419;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+        .logo {
+            border: 1px solid #333;
+            padding: 20px;
+            background: #181A20;
+        }
+        canvas {
+            border: 1px solid #555;
+        }
+        button {
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <h1>CS2 Derivatives Logo Converter</h1>
+    <div class="logo-container">
+        <!-- Main Logo -->
+        <div class="logo">
+            <h3>Main Logo (200x80)</h3>
+            <img id="mainLogo" src="/logo.svg" alt="Main Logo" style="width: 200px; height: 80px;">
+            <canvas id="mainCanvas" width="400" height="160" style="display: none;"></canvas>
+            <br><br>
+            <button onclick="convertLogo('mainLogo', 'mainCanvas', 400, 160, 'cs2-derivatives-logo.png')">
+                Download PNG (400x160)
+            </button>
+        </div>
+
+        <!-- Icon Logo -->
+        <div class="logo">
+            <h3>Icon Logo (40x40)</h3>
+            <img id="iconLogo" src="/logo-icon.svg" alt="Icon Logo" style="width: 40px; height: 40px;">
+            <canvas id="iconCanvas" width="80" height="80" style="display: none;"></canvas>
+            <br><br>
+            <button onclick="convertLogo('iconLogo', 'iconCanvas', 80, 80, 'cs2-derivatives-icon.png')">
+                Download PNG (80x80)
+            </button>
+        </div>
+
+        <!-- Favicon -->
+        <div class="logo">
+            <h3>Favicon (32x32)</h3>
+            <img id="favicon" src="/favicon.svg" alt="Favicon" style="width: 32px; height: 32px;">
+            <canvas id="faviconCanvas" width="64" height="64" style="display: none;"></canvas>
+            <br><br>
+            <button onclick="convertLogo('favicon', 'faviconCanvas', 64, 64, 'cs2-derivatives-favicon.png')">
+                Download PNG (64x64)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function convertLogo(imageId, canvasId, width, height, filename) {
+            const img = document.getElementById(imageId);
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Clear canvas with transparent background
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw the image
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Convert to PNG and download
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/png');
+        }
+
+        // Show preview
+        window.addEventListener('load', function() {
+            console.log('Logo converter ready');
+        });
+    </script>
+</body>
+</html> 

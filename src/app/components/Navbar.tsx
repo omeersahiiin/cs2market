@@ -35,11 +35,16 @@ export default function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">CS</span>
+          <Link href="/" className="flex items-center space-x-3">
+            <img 
+              src="/logo-icon.svg" 
+              alt="CS2 Derivatives" 
+              className="w-10 h-10 hover:scale-105 transition-transform duration-200"
+            />
+            <div className="hidden sm:block">
+              <span className="text-white font-bold text-xl">CS2</span>
+              <span className="text-blue-400 font-medium text-sm ml-1">DERIVATIVES</span>
             </div>
-            <span className="text-white font-bold text-xl hidden sm:block">CS2 Derivatives</span>
           </Link>
 
           {/* Desktop Navigation */}

@@ -284,12 +284,21 @@ export default function HomePage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left side - Text content */}
             <div className="text-center lg:text-left">
-              <div className="mb-6 animate-fade-in-up">
+              {/* Logo Header */}
+              <div className="mb-8 animate-fade-in-up flex items-center justify-center lg:justify-start">
+                <img 
+                  src="/logo.svg" 
+                  alt="CS2 Derivatives" 
+                  className="h-16 md:h-20 hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              
+              <div className="mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
                 <span className="inline-block px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium backdrop-blur-sm">
                   🚀 Professional CS2 Stock Market Trading
                 </span>
               </div>
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
                 Trade CS2 Skins
                 <span className="block bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient-x">
                   Like a Pro

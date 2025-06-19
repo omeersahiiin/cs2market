@@ -1,0 +1,54 @@
+<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="weaponGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2a2a2a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#555555;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2a2a2a;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="20" cy="20" r="18" fill="#0F1419" stroke="#2563eb" stroke-width="1.5"/>
+  
+  <!-- AK-47 centered -->
+  <g transform="translate(5, 15)">
+    <!-- Stock -->
+    <rect x="0" y="5" width="8" height="5" rx="1" fill="url(#weaponGradient)"/>
+    <!-- Receiver -->
+    <rect x="8" y="4" width="15" height="7" rx="1" fill="url(#weaponGradient)"/>
+    <!-- Barrel -->
+    <rect x="23" y="5.5" width="12" height="4" fill="url(#weaponGradient)"/>
+    <!-- Muzzle -->
+    <rect x="35" y="5" width="2" height="5" fill="#666"/>
+    <!-- Magazine -->
+    <rect x="13" y="11" width="5" height="10" rx="2" fill="url(#weaponGradient)"/>
+    <!-- Trigger guard -->
+    <ellipse cx="11" cy="13" rx="2" ry="3" fill="none" stroke="url(#weaponGradient)" stroke-width="1"/>
+  </g>
+  
+  <!-- Trading chart indicators -->
+  <!-- Bullish indicator (top right) -->
+  <g transform="translate(24, 8)">
+    <polyline points="0,8 3,6 6,4 9,2" stroke="#00ff88" stroke-width="1.5" fill="none" filter="url(#glow)"/>
+    <circle cx="9" cy="2" r="1" fill="#00ff88"/>
+  </g>
+  
+  <!-- Bearish indicator (bottom right) -->
+  <g transform="translate(24, 28)">
+    <polyline points="0,2 3,4 6,6 9,8" stroke="#ff4444" stroke-width="1.5" fill="none" filter="url(#glow)"/>
+    <circle cx="9" cy="8" r="1" fill="#ff4444"/>
+  </g>
+  
+  <!-- Small CS2 text -->
+  <text x="20" y="35" font-family="Arial, sans-serif" font-size="6" font-weight="bold" fill="#2563eb" text-anchor="middle">
+    CS2
+  </text>
+</svg> 
