@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     console.log('[Skins API] Attempting to fetch skins from database...');
     
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '200'); // Increased from 50 to 200 to show all skins
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const order = searchParams.get('order') || 'desc';
     
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
     
     // Final fallback - always return mock data if everything fails
     console.log('🆘 Critical error, returning emergency mock data...');
-    const emergencyMockSkins = generateMockSkins(parseInt(new URL(request.url).searchParams.get('limit') || '50'));
+    const emergencyMockSkins = generateMockSkins(parseInt(new URL(request.url).searchParams.get('limit') || '200'));
     
     return NextResponse.json({
       skins: emergencyMockSkins,

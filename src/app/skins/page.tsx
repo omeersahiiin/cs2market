@@ -96,7 +96,7 @@ export default function SkinsPage() {
   useEffect(() => {
     const fetchSkins = async () => {
       try {
-        const response = await fetch('/api/skins');
+        const response = await fetch('/api/skins?limit=200'); // Request all skins
         if (!response.ok) {
           throw new Error('Failed to fetch skins');
         }

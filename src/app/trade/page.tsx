@@ -111,7 +111,7 @@ export default function TradePage() {
   useEffect(() => {
     const fetchSkins = async () => {
       try {
-        const response = await fetch('/api/skins');
+        const response = await fetch('/api/skins?limit=200'); // Request all skins
         const data = await response.json();
         const skinsArray = data.skins || data || [];
         
