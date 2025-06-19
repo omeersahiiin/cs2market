@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatSteamImageUrl, getFallbackImageUrl, getSteamIconUrl } from '../../lib/utils';
+import { useFavorites } from '../../hooks/useFavorites';
 import AdvancedFilters, { FilterState } from '../../components/AdvancedFilters';
 import SkinComparison from '../../components/SkinComparison';
 import WishlistManager from '../../components/WishlistManager';
@@ -64,6 +65,7 @@ const rarityTextColors = {
 };
 
 export default function SkinsPage() {
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [skins, setSkins] = useState<Skin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +87,6 @@ export default function SkinsPage() {
   // UI State
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedSkins, setSelectedSkins] = useState<string[]>([]);
-  const [wishlistItems, setWishlistItems] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
   const [showWishlist, setShowWishlist] = useState(false);
   const [showPortfolio, setShowPortfolio] = useState(false);
@@ -234,12 +235,8 @@ export default function SkinsPage() {
     );
   };
 
-  const toggleWishlist = (skinId: string) => {
-    setWishlistItems(prev => 
-      prev.includes(skinId) 
-        ? prev.filter(id => id !== skinId)
-        : [...prev, skinId]
-    );
+    const toggleWishlist = async (skinId: string) => {
+    await toggleFavorite(skinId);
   };
 
   const openComparison = () => {
@@ -359,7 +356,7 @@ export default function SkinsPage() {
                 className="flex items-center space-x-2 bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors"
               >
                 <HeartSolidIcon className="h-5 w-5" />
-                <span className="hidden sm:inline">Wishlist ({wishlistItems.length})</span>
+                <span className="hidden sm:inline">Wishlist</span>
               </button>
             </div>
 
@@ -403,7 +400,7 @@ export default function SkinsPage() {
                 skin={skin}
                 viewMode={viewMode}
                 isSelected={selectedSkins.includes(skin.id)}
-                isWishlisted={wishlistItems.includes(skin.id)}
+                isWishlisted={isFavorite(skin.id)}
                 onToggleSelection={() => toggleSkinSelection(skin.id)}
                 onToggleWishlist={() => toggleWishlist(skin.id)}
               />

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -15,13 +15,14 @@ import {
   Cog6ToothIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
-import { StarIcon as StarSolidIcon, StarIcon as StarOutlineIcon } from '@heroicons/react/24/solid';
+import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import TradingChart from '@/components/TradingChart';
 import OrderBook from '@/components/OrderBook';
 import TradeHistory from '@/components/TradeHistory';
 import PositionManager from '@/components/PositionManager';
 import ConditionalOrdersList from '@/components/ConditionalOrdersList';
 import { formatSteamImageUrl, getFallbackImageUrl } from '../../lib/utils';
+import { useFavorites } from '../../hooks/useFavorites';
 
 interface Skin {
   id: string;
@@ -82,9 +83,9 @@ const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
 
 export default function TradePage() {
   const { data: session } = useSession();
+  const { favorites, isFavorite, toggleFavorite: handleToggleFavorite } = useFavorites();
   const [selectedSkin, setSelectedSkin] = useState<Skin | null>(null);
   const [skins, setSkins] = useState<Skin[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
   const [orderForm, setOrderForm] = useState<OrderFormData>({
@@ -105,8 +106,6 @@ export default function TradePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'conditional'>('positions');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [favoriteSkins, setFavoriteSkins] = useState<string[]>([]);
-  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
   // Fetch skins data
   useEffect(() => {
@@ -201,32 +200,9 @@ export default function TradePage() {
     fetchUserOrders();
   }, [session, refreshTrigger]);
 
-  // Fetch favorites
-  useEffect(() => {
-    const fetchFavorites = async () => {
-      if (!session) return;
-      try {
-        const response = await fetch('/api/user/favorites');
-        const data = await response.json();
-        if (data.favorites) {
-          setFavoriteSkins(data.favorites.map((f: any) => f.skin.id));
-        }
-      } catch (error) {
-        console.error('Error fetching favorites:', error);
-      }
-    };
-
-    fetchFavorites();
-  }, [session]);
-
-  // Filter skins based on search and favorites
-  const filteredSkins = useMemo(() => {
-    return skins.filter(skin => {
-      const matchesSearch = skin.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesFavorites = !showOnlyFavorites || favoriteSkins.includes(skin.id);
-      return matchesSearch && matchesFavorites;
-    });
-  }, [skins, searchTerm, showOnlyFavorites, favoriteSkins]);
+  const filteredSkins = skins.filter(skin =>
+    skin.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleSkinSelect = (skin: Skin) => {
     setSelectedSkin(skin);
@@ -238,26 +214,7 @@ export default function TradePage() {
   };
 
   const toggleFavorite = async (skinId: string) => {
-    if (!session) return;
-
-    const action = favorites.includes(skinId) ? 'remove' : 'add';
-    try {
-      const response = await fetch('/api/user/favorites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skinId, action })
-      });
-
-      if (response.ok) {
-        setFavorites(prev => 
-          action === 'add' 
-            ? [...prev, skinId]
-            : prev.filter(id => id !== skinId)
-        );
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
+    await handleToggleFavorite(skinId);
   };
 
   const handleOrderFormChange = (field: keyof OrderFormData, value: any) => {
@@ -399,16 +356,13 @@ export default function TradePage() {
                     <p className="text-sm text-gray-400">{selectedSkin.type}</p>
                   </div>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(selectedSkin.id);
-                    }}
+                    onClick={() => toggleFavorite(selectedSkin.id)}
                     className="p-1 text-gray-400 hover:text-yellow-400 transition-colors"
                   >
-                    {favorites.includes(selectedSkin.id) ? (
+                    {isFavorite(selectedSkin.id) ? (
                       <StarSolidIcon className="h-5 w-5 text-yellow-400" />
                     ) : (
-                      <StarOutlineIcon className="h-5 w-5" />
+                      <StarIcon className="h-5 w-5" />
                     )}
                   </button>
                 </div>
@@ -459,28 +413,14 @@ export default function TradePage() {
       <div className="flex h-[calc(100vh-80px)]">
         {/* Left Sidebar - Market List - DOUBLED WIDTH */}
         <div className="w-96 bg-[#181A20] border-r border-[#2A2D3A] flex flex-col">
-          {/* Search and Filter Bar */}
-          <div className="p-4 border-b border-[#2A2D3A] space-y-2">
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                placeholder="Search skins..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 px-3 py-2 bg-[#23262F] border border-[#2A2D3A] rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
-                className={`p-2 rounded-lg transition-colors ${
-                  showOnlyFavorites 
-                    ? 'bg-yellow-500/20 text-yellow-500' 
-                    : 'bg-[#23262F] text-gray-400 hover:text-yellow-500'
-                }`}
-                title={showOnlyFavorites ? 'Show all skins' : 'Show only favorites'}
-              >
-                <StarIcon className="h-5 w-5" />
-              </button>
-            </div>
+          <div className="p-4 border-b border-[#2A2D3A]">
+            <input
+              type="text"
+              placeholder="Search skins..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 bg-[#23262F] border border-[#2A2D3A] rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -495,55 +435,36 @@ export default function TradePage() {
                       : 'bg-[#23262F] hover:bg-[#2A2D3A] border border-transparent'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="relative w-10 h-10 bg-[#1A1C23] rounded-lg flex items-center justify-center overflow-hidden">
-                        <Image
-                          src={formatSteamImageUrl(skin.iconPath)}
-                          alt={skin.name}
-                          width={32}
-                          height={32}
-                          className="object-contain"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = getFallbackImageUrl();
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <h3 className="text-white font-medium">{skin.name}</h3>
-                        <p className="text-sm text-gray-400">{skin.type}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-white font-medium">${skin.price.toLocaleString()}</p>
-                        <p className={`text-sm ${
-                          (skin.priceChangePercent || 0) >= 0 
-                            ? 'text-green-400' 
-                            : 'text-red-400'
-                        }`}>
-                          {(skin.priceChangePercent || 0) >= 0 ? '↗' : '↘'} 
-                          {Math.abs(skin.priceChangePercent || 0).toFixed(2)}%
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(skin.id);
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-[#181A20] rounded-lg p-2 flex-shrink-0">
+                      <Image
+                        src={formatSteamImageUrl(skin.iconPath)}
+                        alt={skin.name}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = getFallbackImageUrl();
                         }}
-                        className={`p-1.5 rounded-md transition-colors ${
-                          favorites.includes(skin.id)
-                            ? 'text-yellow-500 hover:text-yellow-600'
-                            : 'text-gray-400 hover:text-yellow-500'
-                        }`}
-                      >
-                        {favorites.includes(skin.id) ? (
-                          <StarSolidIcon className="h-5 w-5" />
-                        ) : (
-                          <StarOutlineIcon className="h-5 w-5" />
-                        )}
-                      </button>
+                        unoptimized
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-white truncate text-base mb-1">{skin.name}</div>
+                      <div className="text-sm text-gray-400 mb-2">{skin.type}</div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xl font-bold text-white">
+                          ${skin.price.toLocaleString()}
+                        </div>
+                        <div className={`text-base font-semibold px-2 py-1 rounded ${
+                          (skin.priceChangePercent || 0) >= 0 
+                            ? 'text-green-400 bg-green-900/20' 
+                            : 'text-red-400 bg-red-900/20'
+                        }`}>
+                          {(skin.priceChangePercent || 0) >= 0 ? '+' : ''}{(skin.priceChangePercent || 0).toFixed(2)}%
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </button>
