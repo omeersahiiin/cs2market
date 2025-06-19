@@ -11,11 +11,6 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata = {
   title: 'CS2 Derivatives - Professional Skin Trading Platform',
   description: 'Advanced derivatives trading platform for CS2 skins with real-time data, professional tools, and institutional-grade security.',
-  icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
-  },
 };
 
 export default function RootLayout({

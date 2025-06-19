@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import Image from 'next/image';
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -32,22 +31,16 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="bg-gray-900 border-b border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+    <nav className="bg-[#0F1419] border-b border-[#2A2D3A] sticky top-0 z-50 backdrop-blur-sm">
+      <div className="container mx-auto px-4">
+        <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-3">
-              <Image
-                src="/logo-placeholder.svg"
-                alt="CS2 Derivatives Logo"
-                width={120}
-                height={40}
-                className="h-10 w-auto"
-                priority
-              />
-            </Link>
-          </div>
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">CS</span>
+            </div>
+            <span className="text-white font-bold text-xl hidden sm:block">CS2 Derivatives</span>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
@@ -55,8 +48,10 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive(link.href) ? 'bg-blue-600' : ''
+                className={`transition-colors duration-200 ${
+                  isActive(link.href)
+                    ? 'text-blue-400 font-medium'
+                    : 'text-gray-300 hover:text-white'
                 }`}
               >
                 {link.label}
@@ -103,7 +98,7 @@ export default function Navbar() {
               <div className="flex items-center space-x-3">
                 <Link
                   href="/auth/signin"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="px-4 py-2 text-gray-300 hover:text-white transition-colors duration-200"
                 >
                   Sign In
                 </Link>
@@ -118,43 +113,44 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-gray-300 hover:text-white focus:outline-none focus:text-white"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {isMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="md:hidden text-gray-300 hover:text-white transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
 
         {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {navLinks.map((link, index) => (
+        <div className={`md:hidden border-t border-[#2A2D3A] transition-all duration-300 ease-in-out ${
+          isMenuOpen ? 'max-h-screen opacity-100 py-4' : 'max-h-0 opacity-0 overflow-hidden'
+        }`}>
+          <div className="flex flex-col space-y-2">
+            {navLinks.map((link, index) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`text-gray-300 hover:text-white block px-3 py-2 rounded-md text-base font-medium ${
-                    isActive(link.href) ? 'bg-blue-600' : ''
-                  }`}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  {link.label}
+                className={`mobile-optimized px-4 py-3 rounded-lg transition-all duration-200 transform ${
+                    isActive(link.href)
+                    ? 'bg-blue-500/20 text-blue-400 scale-105'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-800 hover:scale-105'
+                } ${isMenuOpen ? 'animate-fade-in-up' : ''}`}
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <span className="mobile-text font-medium">{link.label}</span>
                 </Link>
               ))}
               
               {session ? (
                 <>
-                  <div className="px-4 py-2 border-t border-gray-800 mt-4 pt-4">
+                  <div className="px-4 py-2 border-t border-[#2A2D3A] mt-4 pt-4">
                     <div className="text-sm text-gray-400 mb-1">Balance</div>
                     <div className="text-green-400 font-semibold mb-4">
                       ${balance !== null ? balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '...'}
@@ -189,7 +185,7 @@ export default function Navbar() {
                   </div>
                 </>
               ) : (
-                <div className="px-4 py-2 border-t border-gray-800 mt-4 pt-4 space-y-2">
+                <div className="px-4 py-2 border-t border-[#2A2D3A] mt-4 pt-4 space-y-2">
                   <Link
                     href="/auth/signin"
                     onClick={() => setIsMenuOpen(false)}
@@ -208,7 +204,6 @@ export default function Navbar() {
               )}
             </div>
           </div>
-        )}
       </div>
     </nav>
   );
